@@ -1,4 +1,5 @@
 import Navbar from '@/components/studentportal/layout/navbar';
+import { Suspense } from 'react';
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,7 +12,11 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
       <div className="relative z-10">
         <Navbar />
-        <main>{children}</main>
+        <main>
+          <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-white/50">Synchronizing...</div>}>
+            {children}
+          </Suspense>
+        </main>
       </div>
     </div>
   );

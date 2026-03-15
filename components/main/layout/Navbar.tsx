@@ -34,7 +34,7 @@ export default function Navbar() {
         {/* CTA Button */}
         <div className="hidden md:flex items-center">
           <Link
-            href="/auth/register"
+            href="/auth/sign-up"
             className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white px-6 py-2 rounded-full text-sm font-semibold transition-colors"
           >
             Join Now
@@ -68,7 +68,7 @@ export default function Navbar() {
             </Link>
             <div className="pt-4 border-t border-white/10">
               <Link
-                href="/auth/register"
+                href="/auth/sign-up"
                 className="block w-full bg-[#8b5cf6] hover:bg-[#7c3aed] text-white px-6 py-3 rounded-full font-medium text-center transition-colors"
                 onClick={() => setIsOpen(false)}
               >
