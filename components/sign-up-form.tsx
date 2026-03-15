@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowRight, IdCard, User, Phone, Mail, MapPin, Lock, ShieldCheck, ChevronLeft, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,7 +24,16 @@ export function SignUpForm({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   const handleNextStep = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +68,7 @@ export function SignUpForm({
         },
       });
       if (error) throw error;
-      router.push("/auth/sign-up-success");
+      router.push("/student");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -93,7 +102,7 @@ export function SignUpForm({
   const strengthInfo = getStrengthInfo(strengthScore);
 
   return (
-    <div className={cn("relative flex min-h-screen items-center justify-center bg-[#0f0c29] p-4 lg:p-8 font-sans text-white overflow-hidden", className)} {...props}>
+    <div suppressHydrationWarning className={cn("relative flex min-h-screen items-center justify-center bg-[#0f0c29] p-4 lg:p-8 font-sans text-white overflow-hidden", className)} {...props}>
       {/* Dynamic Background Elements */}
       <div className="absolute inset-0 z-0 pointer-events-none blur-[80px]">
         <div className="absolute -left-[100px] -top-[100px] h-[600px] w-[600px] animate-pulse rounded-full bg-[#4A00E0] opacity-60" style={{ animationDuration: '20s' }}></div>
@@ -158,6 +167,7 @@ export function SignUpForm({
                     <div className="group flex h-[48px] items-center gap-[12px] rounded-[10px] border border-white/10 bg-[rgba(0,0,0,0.3)] px-[1rem] transition-all duration-300 focus-within:border-[#8E2DE2] focus-within:bg-[rgba(0,0,0,0.5)] focus-within:shadow-[0_0_15px_rgba(142,45,226,0.3)]">
                       <User className="h-[1rem] w-[1rem] text-[#b3b3b3]" />
                       <input 
+                        suppressHydrationWarning
                         type="text" 
                         id="firstName" 
                         className="h-full w-full bg-transparent text-[0.95rem] text-white outline-none placeholder:text-white/30" 
@@ -174,6 +184,7 @@ export function SignUpForm({
                     <div className="group flex h-[48px] items-center gap-[12px] rounded-[10px] border border-white/10 bg-[rgba(0,0,0,0.3)] px-[1rem] transition-all duration-300 focus-within:border-[#8E2DE2] focus-within:bg-[rgba(0,0,0,0.5)] focus-within:shadow-[0_0_15px_rgba(142,45,226,0.3)]">
                       <User className="h-[1rem] w-[1rem] text-[#b3b3b3]" />
                       <input 
+                        suppressHydrationWarning
                         type="text" 
                         id="lastName" 
                         className="h-full w-full bg-transparent text-[0.95rem] text-white outline-none placeholder:text-white/30" 
@@ -192,6 +203,7 @@ export function SignUpForm({
                   <div className="group flex h-[48px] items-center gap-[12px] rounded-[10px] border border-white/10 bg-[rgba(0,0,0,0.3)] px-[1rem] transition-all duration-300 focus-within:border-[#8E2DE2] focus-within:bg-[rgba(0,0,0,0.5)] focus-within:shadow-[0_0_15px_rgba(142,45,226,0.3)]">
                     <IdCard className="h-[1rem] w-[1rem] text-[#b3b3b3]" />
                     <input 
+                      suppressHydrationWarning
                       type="text" 
                       id="studentId" 
                       className="h-full w-full bg-transparent text-[0.95rem] text-white outline-none placeholder:text-white/30" 
@@ -210,6 +222,7 @@ export function SignUpForm({
                     <div className="group flex h-[48px] items-center gap-[12px] rounded-[10px] border border-white/10 bg-[rgba(0,0,0,0.3)] px-[1rem] transition-all duration-300 focus-within:border-[#8E2DE2] focus-within:bg-[rgba(0,0,0,0.5)] focus-within:shadow-[0_0_15px_rgba(142,45,226,0.3)]">
                       <Phone className="h-[1rem] w-[1rem] text-[#b3b3b3]" />
                       <input 
+                        suppressHydrationWarning
                         type="tel" 
                         id="mobile" 
                         className="h-full w-full bg-transparent text-[0.95rem] text-white outline-none placeholder:text-white/30" 
@@ -226,6 +239,7 @@ export function SignUpForm({
                     <div className="group flex h-[48px] items-center gap-[12px] rounded-[10px] border border-white/10 bg-[rgba(0,0,0,0.3)] px-[1rem] transition-all duration-300 focus-within:border-[#8E2DE2] focus-within:bg-[rgba(0,0,0,0.5)] focus-within:shadow-[0_0_15px_rgba(142,45,226,0.3)]">
                       <Mail className="h-[1rem] w-[1rem] text-[#b3b3b3]" />
                       <input 
+                        suppressHydrationWarning
                         type="email" 
                         id="email" 
                         className="h-full w-full bg-transparent text-[0.95rem] text-white outline-none placeholder:text-white/30" 
@@ -244,6 +258,7 @@ export function SignUpForm({
                   <div className="group flex h-[48px] items-center gap-[12px] rounded-[10px] border border-white/10 bg-[rgba(0,0,0,0.3)] px-[1rem] transition-all duration-300 focus-within:border-[#8E2DE2] focus-within:bg-[rgba(0,0,0,0.5)] focus-within:shadow-[0_0_15px_rgba(142,45,226,0.3)]">
                     <MapPin className="h-[1rem] w-[1rem] text-[#b3b3b3]" />
                     <input 
+                      suppressHydrationWarning
                       type="text" 
                       id="address" 
                       className="h-full w-full bg-transparent text-[0.95rem] text-white outline-none placeholder:text-white/30" 
@@ -311,6 +326,7 @@ export function SignUpForm({
                   <div className="group flex h-[48px] items-center gap-[12px] rounded-[10px] border border-white/10 bg-[rgba(0,0,0,0.3)] px-[1rem] transition-all duration-300 focus-within:border-[#8E2DE2] focus-within:bg-[rgba(0,0,0,0.5)] focus-within:shadow-[0_0_15px_rgba(142,45,226,0.3)]">
                     <Lock className="h-[1rem] w-[1rem] text-[#b3b3b3]" />
                     <input 
+                      suppressHydrationWarning
                       type={showPassword ? "text" : "password"} 
                       id="password"
                       value={password}
@@ -349,6 +365,7 @@ export function SignUpForm({
                   <div className={`group flex h-[48px] items-center gap-[12px] rounded-[10px] border px-[1rem] transition-all duration-300 bg-[rgba(0,0,0,0.3)] focus-within:bg-[rgba(0,0,0,0.5)] focus-within:border-[#8E2DE2] focus-within:shadow-[0_0_15px_rgba(142,45,226,0.3)] ${confirmPassword && password !== confirmPassword ? 'border-red-500 focus-within:border-red-500 focus-within:shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'border-white/10'}`}>
                     <ShieldCheck className="h-[1rem] w-[1rem] text-[#b3b3b3]" />
                     <input 
+                      suppressHydrationWarning
                       type={showConfirmPassword ? "text" : "password"} 
                       id="confirmPassword"
                       value={confirmPassword}

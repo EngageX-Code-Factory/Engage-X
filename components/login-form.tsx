@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowRight, Fingerprint, IdCard, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,7 +16,16 @@ export function LoginForm({
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +39,7 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
-      router.push("/protected");
+      router.push("/student");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -39,7 +48,7 @@ export function LoginForm({
   };
 
   return (
-    <div className={cn("relative flex min-h-screen items-center justify-center bg-[#0f0c29] p-4 lg:p-8 font-sans text-white overflow-hidden", className)} {...props}>
+    <div suppressHydrationWarning className={cn("relative flex min-h-screen items-center justify-center bg-[#0f0c29] p-4 lg:p-8 font-sans text-white overflow-hidden", className)} {...props}>
       {/* Dynamic Background Elements */}
       <div className="absolute inset-0 z-0 pointer-events-none blur-[80px]">
         <div className="absolute -left-[100px] -top-[100px] h-[600px] w-[600px] animate-pulse rounded-full bg-[#4A00E0] opacity-60" style={{ animationDuration: '20s' }}></div>
@@ -109,6 +118,7 @@ export function LoginForm({
               <div className="group flex h-[55px] items-center gap-[15px] rounded-[12px] border border-white/10 bg-[rgba(0,0,0,0.3)] px-[1.2rem] transition-all duration-300 focus-within:border-[#8E2DE2] focus-within:bg-[rgba(0,0,0,0.5)] focus-within:shadow-[0_0_15px_rgba(142,45,226,0.3)]">
                 <IdCard className="h-[1.1rem] w-[1.1rem] text-[#b3b3b3]" />
                 <input
+                  suppressHydrationWarning
                   type="email"
                   id="email"
                   className="h-full w-full bg-transparent text-[1rem] text-white outline-none placeholder:text-white/30"
@@ -129,6 +139,7 @@ export function LoginForm({
               <div className="group flex h-[55px] items-center gap-[15px] rounded-[12px] border border-white/10 bg-[rgba(0,0,0,0.3)] px-[1.2rem] transition-all duration-300 focus-within:border-[#8E2DE2] focus-within:bg-[rgba(0,0,0,0.5)] focus-within:shadow-[0_0_15px_rgba(142,45,226,0.3)]">
                 <Fingerprint className="h-[1.1rem] w-[1.1rem] text-[#b3b3b3]" />
                 <input
+                  suppressHydrationWarning
                   type={showPassword ? "text" : "password"}
                   id="password"
                   className="h-full flex-1 bg-transparent text-[1rem] text-white outline-none placeholder:text-white/30"
