@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Pencil, Mail, Calendar, Users, Facebook, Twitter, Instagram, MessageCircle, ImageIcon, Building2, ImagePlus, X } from "lucide-react";
+import { Pencil, Mail, Calendar, Users, Facebook, Twitter, Instagram, MessageCircle, ImageIcon, Building2, ImagePlus, X, Camera } from "lucide-react";
 
 const DUMMY_PROFILE = {
   name: "IEEE Student Branch",
@@ -22,18 +22,24 @@ const DUMMY_PROFILE = {
 
 export default function ClubProfileView() {
   const p = DUMMY_PROFILE;
+  const [logoPhoto, setLogoPhoto] = useState<string | null>(null);
   const [gallery, setGallery] = useState<string[]>([
     "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400",
     "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400",
     "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=400",
   ]);
 
+  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoPhoto(URL.createObjectURL(file));
+  }
+
   function handleGalleryUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files) return;
     Array.from(files).forEach(file => {
-      const url = URL.createObjectURL(file);
-      setGallery(prev => [...prev, url]);
+      setGallery(prev => [...prev, URL.createObjectURL(file)]);
     });
   }
 
@@ -56,20 +62,28 @@ export default function ClubProfileView() {
         </Link>
       </div>
 
-      {/* Club Banner */}
-      <div className="bg-white dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
-        <div className="h-32 bg-gradient-to-r from-[#8b5cf6] to-[#6d28d9]" />
-        <div className="px-6 pb-6">
-          <div className="flex items-end gap-4 -mt-10 mb-4">
-            <div className="w-20 h-20 rounded-2xl bg-white dark:bg-[#0f0c1d] border-4 border-white dark:border-[#0b0515] flex items-center justify-center shadow-lg shrink-0">
-              <span className="text-2xl font-bold text-[#8b5cf6]">{p.name.charAt(0)}</span>
+      {/* Club Card */}
+      <div className="bg-white dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 p-6">
+        <div className="flex items-center gap-5">
+          {/* Logo — uploadable */}
+          <div className="relative group shrink-0">
+            <div className="w-20 h-20 rounded-2xl bg-purple-50 dark:bg-purple-500/20 border border-gray-200 dark:border-white/10 flex items-center justify-center overflow-hidden">
+              {logoPhoto
+                ? <img src={logoPhoto} alt="Logo" className="w-full h-full object-cover" />
+                : <span className="text-2xl font-bold text-[#8b5cf6]">{p.name.charAt(0)}</span>
+              }
             </div>
-            <div className="pb-1">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">{p.name}</h3>
-              <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-500/10 text-[#8b5cf6]">{p.category}</span>
-            </div>
+            <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+              <Camera size={14} className="text-white" />
+              <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+            </label>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-300">{p.description}</p>
+
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{p.name}</h3>
+            <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-500/10 text-[#8b5cf6] inline-block mt-1">{p.category}</span>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">{p.description}</p>
+          </div>
         </div>
       </div>
 
@@ -86,7 +100,7 @@ export default function ClubProfileView() {
             <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{p.about}</p>
           </div>
 
-          {/* Gallery — uploadable from view page */}
+          {/* Gallery */}
           <div className="bg-white dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 p-6">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-base font-semibold text-gray-800 dark:text-white flex items-center gap-2">
@@ -200,7 +214,6 @@ export default function ClubProfileView() {
               )}
             </div>
           </div>
-
         </div>
       </div>
     </div>
