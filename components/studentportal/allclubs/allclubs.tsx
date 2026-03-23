@@ -1,102 +1,27 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, Users, Calendar, ChevronLeft, ChevronRight, RefreshCw, ExternalLink, UserPlus, LayoutGrid, List } from 'lucide-react';
 import Link from 'next/link';
 import JoinClubModal from './JoinClubModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Club {
-  id: number;
+  id: string; // Changed from number to string for UUID
   name: string;
-  faculty: string;
   category: string;
   description: string;
-  members: number;
-  events: number;
+  members_count: number; // Mapped from members
+  events_count: number; // Mapped from events
   status?: string; // e.g., 'Auditions Open'
-  image: string;
+  image_url: string; // Mapped from image
 }
 
 // ── Data ──────────────────────────────────────────────────────────────────
-const allClubs: Club[] = [
-  {
-    id: 1, name: 'Robotics & AI Club', faculty: 'Faculty of Computing', category: 'TECHNOLOGY',
-    description: 'Building the future with code and gears. Join us for weekly workshops, hackathons, and robot wars.',
-    members: 150, events: 3,
-    image: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&h=280&fit=crop',
-  },
-  {
-    id: 2, name: 'Rhythm Music Society', faculty: 'Faculty of Arts', category: 'MUSIC',
-    description: 'For those who live and breathe music. Jam sessions every Friday and annual campus concerts.',
-    members: 85, events: 1,
-    image: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=600&h=280&fit=crop',
-  },
-  {
-    id: 3, name: 'Extreme Sports Club', faculty: 'Sports Department', category: 'SPORTS',
-    description: 'Pushing limits together. From rock climbing to surfing, we organize monthly trips for adrenaline seekers.',
-    members: 120, events: 2,
-    image: 'https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=600&h=280&fit=crop',
-  },
-  {
-    id: 4, name: 'Drama & Theatre', faculty: 'Faculty of Arts', category: 'ARTS',
-    description: 'Express yourself on stage. We produce two major plays a year and host weekly improv workshops.',
-    members: 60, events: 0, status: 'Auditions Open',
-    image: 'https://images.unsplash.com/photo-1460723237483-7a6dc9d0b212?w=600&h=280&fit=crop',
-  },
-  {
-    id: 5, name: 'Science Research Hub', faculty: 'Faculty of Science', category: 'ACADEMIC',
-    description: 'Collaborate on cutting-edge research projects. Connect with professors and publish your findings.',
-    members: 45, events: 1,
-    image: 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=600&h=280&fit=crop',
-  },
-  {
-    id: 6, name: 'Photography Society', faculty: 'Faculty of Arts', category: 'ARTS',
-    description: 'Capturing moments, creating memories. Weekly shoots, exhibitions, and darkroom access.',
-    members: 48, events: 2,
-    image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&h=280&fit=crop',
-  },
-  {
-    id: 7, name: 'Coding Club', faculty: 'Faculty of Engineering', category: 'TECHNOLOGY',
-    description: 'Building the future, one line at a time. Join us for weekly hackathons, CTFs and open-source contributions.',
-    members: 120, events: 4,
-    image: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=600&h=280&fit=crop',
-  },
-  {
-    id: 8, name: 'Debate Society', faculty: 'Faculty of Humanities', category: 'ACADEMIC',
-    description: 'Sharpen argumentation and public speaking in competitive, collegiate-level environments.',
-    members: 34, events: 2,
-    image: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=600&h=280&fit=crop',
-  },
-  {
-    id: 9, name: 'Football Club', faculty: 'Sports Department', category: 'SPORTS',
-    description: 'Train and compete with the best. We participate in inter-university leagues and friendly tournaments.',
-    members: 200, events: 5,
-    image: 'https://images.unsplash.com/photo-1509563268479-0f004cf3f58b?w=600&h=280&fit=crop',
-  },
-  {
-    id: 10, name: 'Entrepreneurship Cell', faculty: 'Faculty of Business', category: 'BUSINESS',
-    description: 'Connect ideas with execution. Mentorship, pitch competitions, and startup ecosystem access.',
-    members: 73, events: 3,
-    image: 'https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=600&h=280&fit=crop',
-  },
-  {
-    id: 11, name: 'Film Society', faculty: 'Faculty of Arts', category: 'ARTS',
-    description: 'Cinephiles unite! Weekly screenings, discussions, and short film production projects.',
-    members: 52, events: 2,
-    image: 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=600&h=280&fit=crop',
-  },
-  {
-    id: 12, name: 'Environmental Club', faculty: 'Faculty of Science', category: 'ACADEMIC',
-    description: 'Sustainability initiatives, campus clean-ups, and environmental awareness campaigns for a greener future.',
-    members: 41, events: 1,
-    image: 'https://images.unsplash.com/photo-1470058869958-2a77ade41c02?w=600&h=280&fit=crop',
-  },
-];
+// Initial empty state, will fetch from API
+const initialClubs: Club[] = [];
 
 const CATEGORIES = ['All', 'TECHNOLOGY', 'ARTS', 'MUSIC', 'SPORTS', 'ACADEMIC', 'BUSINESS'];
-const FACULTIES = ['All Faculties', 'Faculty of Computing', 'Faculty of Arts', 'Faculty of Engineering',
-  'Faculty of Science', 'Faculty of Humanities', 'Faculty of Business', 'Sports Department'];
 
 const CATEGORY_COLORS: Record<string, string> = {
   TECHNOLOGY: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/20',
@@ -112,20 +37,13 @@ const ITEMS_PER_PAGE = 6;
 // ── Club Card ─────────────────────────────────────────────────────────────
 function ClubCard({ club, onJoin }: { club: Club; onJoin: (club: Club) => void }) {
   const catClass = CATEGORY_COLORS[club.category] ?? 'bg-gray-500/20 text-gray-300 border-gray-500/20';
-  const facultyColor = club.faculty === 'Faculty of Arts' ? 'text-amber-400'
-    : club.faculty === 'Faculty of Computing' ? 'text-indigo-400'
-    : club.faculty === 'Faculty of Science' ? 'text-emerald-400'
-    : club.faculty === 'Faculty of Engineering' ? 'text-sky-400'
-    : club.faculty === 'Faculty of Humanities' ? 'text-orange-400'
-    : club.faculty === 'Faculty of Business' ? 'text-violet-400'
-    : 'text-pink-400';
 
   return (
     <div className="bg-white/3 border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/40 hover:-translate-y-1 transition-all duration-300 group flex flex-col">
       {/* Club Image */}
       <div className="relative h-44 overflow-hidden">
         <img
-          src={club.image}
+          src={club.image_url}
           alt={club.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
@@ -144,9 +62,6 @@ function ClubCard({ club, onJoin }: { club: Club; onJoin: (club: Club) => void }
       {/* Content */}
       <div className="p-5 flex-1 flex flex-col">
         <h3 className="text-white font-bold text-base leading-tight">{club.name}</h3>
-        <p className={`text-[11px] font-semibold tracking-wide uppercase mt-0.5 ${facultyColor}`}>
-          {club.faculty}
-        </p>
 
         <p className="text-gray-400 text-sm mt-2.5 leading-relaxed flex-1 line-clamp-3">
           {club.description}
@@ -156,12 +71,12 @@ function ClubCard({ club, onJoin }: { club: Club; onJoin: (club: Club) => void }
         <div className="flex items-center gap-4 mt-4 text-xs text-gray-500">
           <span className="flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5" />
-            <span className="text-gray-300 font-medium">{club.members}+ Members</span>
+            <span className="text-gray-300 font-medium">{club.members_count}+ Members</span>
           </span>
           <span className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5" />
             <span className="text-gray-300 font-medium">
-              {club.events} Upcoming Event{club.events !== 1 ? 's' : ''}
+              {club.events_count} Upcoming Event{club.events_count !== 1 ? 's' : ''}
             </span>
           </span>
         </div>
@@ -219,13 +134,33 @@ function Pagination({ total, perPage, current, onChange }: {
 
 // ── Main ──────────────────────────────────────────────────────────────────
 export default function AllClubs() {
+  const [clubs, setClubs] = useState<Club[]>(initialClubs);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
-  const [faculty, setFaculty] = useState('All Faculties');
   const [currentPage, setCurrentPage] = useState(1);
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [selectedClub, setSelectedClub] = useState<Club | null>(null);
+
+  useEffect(() => {
+    const fetchClubs = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/student/clubs');
+        if (response.ok) {
+          const data = await response.json();
+          setClubs(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch clubs', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClubs();
+  }, []);
 
   const handleJoinClick = (club: Club) => {
     setSelectedClub(club);
@@ -233,14 +168,13 @@ export default function AllClubs() {
   };
 
   const filtered = useMemo(() => {
-    return allClubs.filter((c) => {
+    return clubs.filter((c) => {
       const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
         c.description.toLowerCase().includes(search.toLowerCase());
       const matchCategory = category === 'All' || c.category === category;
-      const matchFaculty = faculty === 'All Faculties' || c.faculty === faculty;
-      return matchSearch && matchCategory && matchFaculty;
+      return matchSearch && matchCategory;
     });
-  }, [search, category, faculty]);
+  }, [clubs, search, category]);
 
   const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
@@ -252,7 +186,6 @@ export default function AllClubs() {
   const handleReset = () => {
     setSearch('');
     setCategory('All');
-    setFaculty('All Faculties');
     setCurrentPage(1);
   };
 
@@ -298,20 +231,6 @@ export default function AllClubs() {
           <ChevronLeft className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 -rotate-90 pointer-events-none" />
         </div>
 
-        {/* Faculty Dropdown */}
-        <div className="relative">
-          <select
-            value={faculty}
-            onChange={(e) => handleFilterChange(setFaculty)(e.target.value)}
-            className="appearance-none bg-white/5 border border-white/10 rounded-xl pl-4 pr-9 py-2.5 text-sm text-gray-300 outline-none hover:border-purple-500/40 transition-colors cursor-pointer min-w-[180px]"
-          >
-            {FACULTIES.map((f) => (
-              <option key={f} value={f} className="bg-[#0f0c29] text-white">{f}</option>
-            ))}
-          </select>
-          <ChevronLeft className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 -rotate-90 pointer-events-none" />
-        </div>
-
         {/* Reset */}
         <button
           onClick={handleReset}
@@ -328,7 +247,7 @@ export default function AllClubs() {
           <span className="w-1 h-5 bg-purple-500 rounded-full inline-block" />
           <p className="text-sm text-gray-400">
             Showing <span className="text-white font-semibold">{filtered.length}</span> club{filtered.length !== 1 ? 's' : ''}
-            {(category !== 'All' || faculty !== 'All Faculties' || search) && (
+            {(category !== 'All' || search) && (
               <span className="text-purple-400"> (filtered)</span>
             )}
           </p>
@@ -352,7 +271,11 @@ export default function AllClubs() {
       </div>
 
       {/* ── Result Grid/List ── */}
-      {paginated.length > 0 ? (
+      {loading ? (
+        <div className="flex justify-center items-center py-24">
+          <RefreshCw className="w-10 h-10 text-purple-500 animate-spin" />
+        </div>
+      ) : paginated.length > 0 ? (
         <div className={view === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5' : 'flex flex-col gap-4'}>
           {paginated.map((club) => (
             view === 'grid' ? (
@@ -378,10 +301,10 @@ export default function AllClubs() {
                       </span>
                     )}
                   </div>
-                  <p className="text-amber-400 text-[11px] font-semibold tracking-wide uppercase mt-0.5">{club.faculty}</p>
+                  
                   <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
-                    <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> {club.members}+ members</span>
-                    <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {club.events} upcoming events</span>
+                    <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> {club.members_count}+ members</span>
+                    <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {club.events_count} upcoming events</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
