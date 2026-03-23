@@ -4,6 +4,8 @@ import { Bell, ChevronDown, Zap, Home } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { RealtimeChannel } from '@supabase/supabase-js';
 import ConfirmationModal from './ConfirmationModal';
 
 const navLinks = [
@@ -17,8 +19,74 @@ const navLinks = [
 export default function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [profileData, setProfileData] = useState({
+    firstName: '',
+    lastName: '',
+    avatarUrl: ''
+  });
   const profileRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notifications count
+  useEffect(() => {
+    const supabase = createClient();
+    let channel: RealtimeChannel;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { count, error } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true }) // Only count, no data fetch if possible, but we need filter
+          .eq('user_id', user.id)
+          .eq('is_read', false); // Assuming 'is_read' in DB is snake_case, verify schema
+
+        if (!error && count !== null) {
+            setUnreadCount(count);
+        }
+      } catch (error) {
+        console.error('Failed to fetch notifications count', error);
+      }
+    };
+
+    const setupRealtime = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Subscribe to changes for this user
+        channel = supabase
+            .channel('realtime-navbar-notifications')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `user_id=eq.${user.id}`
+                },
+                () => {
+                    fetchUnreadCount();
+                }
+            )
+            .subscribe();
+        
+        // Initial fetch
+        fetchUnreadCount();
+    };
+
+    setupRealtime();
+    
+    // Refresh count every minute as backup
+    const interval = setInterval(fetchUnreadCount, 60000);
+    
+    return () => {
+        clearInterval(interval);
+        if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -35,6 +103,26 @@ export default function Navbar() {
   useEffect(() => {
     setProfileOpen(false);
   }, [pathname]);
+
+  // Fetch profile data
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch('/api/student/profile');
+        if (response.ok) {
+          const data = await response.json();
+          setProfileData({
+            firstName: data.first_name || '',
+            lastName: data.last_name || '',
+            avatarUrl: data.avatar_url || ''
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch profile for navbar', error);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   return (
     <>
@@ -93,9 +181,11 @@ export default function Navbar() {
               className="relative p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
             >
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">
-                3
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </Link>
 
             {/* Profile */}
@@ -104,10 +194,26 @@ export default function Navbar() {
                 onClick={() => setProfileOpen((prev) => !prev)}
                 className="flex items-center gap-2.5 pl-1 pr-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold">
-                  A
-                </div>
-                <span className="text-sm font-medium text-gray-200">Alex Morgan</span>
+                {profileData.avatarUrl ? (
+                  <img
+                    src={profileData.avatarUrl}
+                    alt="Profile"
+                    className="w-8 h-8 rounded-full object-cover border border-white/10"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold">
+                    {profileData.firstName && profileData.lastName
+                      ? `${profileData.firstName[0]}${profileData.lastName[0]}`.toUpperCase()
+                      : 'A'
+                    }
+                  </div>
+                )}
+                <span className="text-sm font-medium text-gray-200">
+                  {profileData.firstName && profileData.lastName
+                    ? `${profileData.firstName} ${profileData.lastName}`
+                    : 'Alex Morgan'
+                  }
+                </span>
                 <ChevronDown className="w-4 h-4 text-gray-400" />
               </button>
 

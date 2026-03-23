@@ -1,13 +1,45 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle2, Megaphone, Eye } from 'lucide-react';
 import Link from 'next/link';
 
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'emergency' | 'academic' | 'club' | 'system';
+  isRead: boolean;
+  created_at: string;
+}
+
 export default function EmergencyAlert() {
   const [isVisible, setIsVisible] = useState(true);
+  const [alert, setAlert] = useState<Notification | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!isVisible) return null;
+  useEffect(() => {
+    const fetchLatestEmergency = async () => {
+      try {
+        const response = await fetch('/api/student/notifications');
+        if (response.ok) {
+          const data = await response.json();
+          // Find the newest emergency notification that hasn't been read (or just newest)
+          // API returns sorted by created_at desc
+          const emergency = data.find((n: Notification) => n.type === 'emergency');
+          setAlert(emergency || null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch emergency alerts', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLatestEmergency();
+  }, []);
+
+  if (!isVisible || !alert || loading) return null;
 
   return (
     <div className="relative group animate-in fade-in slide-in-from-top duration-500 max-w-fit">
@@ -36,7 +68,7 @@ export default function EmergencyAlert() {
               </span>
             </div>
             <h2 className="text-[11px] font-black text-white italic tracking-tight whitespace-nowrap">
-              Weather Alert: <span className="text-red-500 uppercase not-italic">Campus Closing Early</span>
+              {alert.title}: <span className="text-red-500 uppercase not-italic truncate max-w-[200px] inline-block align-bottom">{alert.message}</span>
             </h2>
           </div>
         </div>
@@ -52,7 +84,7 @@ export default function EmergencyAlert() {
           </Link>
           <button 
             onClick={() => setIsVisible(false)}
-            title="Mark as Read"
+            title="Dismiss"
             className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-600 text-white shadow-lg shadow-red-900/40 hover:scale-[1.05] active:scale-95 transition-all"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />

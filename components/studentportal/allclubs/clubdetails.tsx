@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  ArrowLeft, Users, Star, Calendar, MapPin,
+  ArrowLeft, Users, Star, MapPin,
   Clock, Facebook, Twitter, Instagram, MessageSquare,
   UserPlus, CheckCircle, Images
 } from 'lucide-react';
