@@ -24,9 +24,8 @@ export default function EmergencyAlert() {
         const response = await fetch('/api/student/notifications');
         if (response.ok) {
           const data = await response.json();
-          // Find the newest emergency notification that hasn't been read (or just newest)
-          // API returns sorted by created_at desc
-          const emergency = data.find((n: Notification) => n.type === 'emergency');
+          // Find the newest emergency notification that hasn't been read
+          const emergency = data.find((n: Notification) => n.type === 'emergency' && !n.isRead);
           setAlert(emergency || null);
         }
       } catch (error) {
@@ -38,6 +37,21 @@ export default function EmergencyAlert() {
 
     fetchLatestEmergency();
   }, []);
+
+  const handleDismiss = async () => {
+    if (!alert) return;
+    setIsVisible(false); // Hide immediately
+
+    try {
+      await fetch('/api/student/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'markAsRead', notificationId: alert.id })
+      });
+    } catch (error) {
+      console.error('Failed to mark alert as read', error);
+    }
+  };
 
   if (!isVisible || !alert || loading) return null;
 
@@ -83,7 +97,7 @@ export default function EmergencyAlert() {
             <Eye className="w-3.5 h-3.5" />
           </Link>
           <button 
-            onClick={() => setIsVisible(false)}
+            onClick={handleDismiss}
             title="Dismiss"
             className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-600 text-white shadow-lg shadow-red-900/40 hover:scale-[1.05] active:scale-95 transition-all"
           >
