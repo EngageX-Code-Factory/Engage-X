@@ -17,6 +17,11 @@ const navLinks = [
 export default function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [profileData, setProfileData] = useState({
+    firstName: '',
+    lastName: '',
+    avatarUrl: ''
+  });
   const profileRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
@@ -35,6 +40,26 @@ export default function Navbar() {
   useEffect(() => {
     setProfileOpen(false);
   }, [pathname]);
+
+  // Fetch profile data
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch('/api/student/profile');
+        if (response.ok) {
+          const data = await response.json();
+          setProfileData({
+            firstName: data.first_name || '',
+            lastName: data.last_name || '',
+            avatarUrl: data.avatar_url || ''
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch profile for navbar', error);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   return (
     <>
@@ -104,10 +129,26 @@ export default function Navbar() {
                 onClick={() => setProfileOpen((prev) => !prev)}
                 className="flex items-center gap-2.5 pl-1 pr-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold">
-                  A
-                </div>
-                <span className="text-sm font-medium text-gray-200">Alex Morgan</span>
+                {profileData.avatarUrl ? (
+                  <img
+                    src={profileData.avatarUrl}
+                    alt="Profile"
+                    className="w-8 h-8 rounded-full object-cover border border-white/10"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold">
+                    {profileData.firstName && profileData.lastName
+                      ? `${profileData.firstName[0]}${profileData.lastName[0]}`.toUpperCase()
+                      : 'A'
+                    }
+                  </div>
+                )}
+                <span className="text-sm font-medium text-gray-200">
+                  {profileData.firstName && profileData.lastName
+                    ? `${profileData.firstName} ${profileData.lastName}`
+                    : 'Alex Morgan'
+                  }
+                </span>
                 <ChevronDown className="w-4 h-4 text-gray-400" />
               </button>
 
