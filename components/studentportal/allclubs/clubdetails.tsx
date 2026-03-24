@@ -1,15 +1,17 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
   ArrowLeft, Users, Star, MapPin,
-  Clock, Facebook, Twitter, Instagram, MessageSquare,
+  Clock, Facebook, Twitter, Instagram,
   UserPlus, CheckCircle, Images
 } from 'lucide-react';
 import Link from 'next/link';
+import JoinClubModal from './JoinClubModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface ClubEvent {
-  id: number;
+  id: string;
   day: number;
   month: string;
   title: string;
@@ -21,8 +23,9 @@ interface ClubEvent {
   image: string;
 }
 
+
 interface ClubDetailsData {
-  id: number;
+  id: string;
   name: string;
   category: string;
   faculty: string;
@@ -36,76 +39,13 @@ interface ClubDetailsData {
   whatWeDo: string[];
   gallery: string[];
   events: ClubEvent[];
+  socialLinks?: {
+    facebook?: string;
+    twitter?: string;
+    instagram?: string;
+    linkedin?: string;
+  };
 }
-
-// ── Mock Data ─────────────────────────────────────────────────────────────
-export const CLUB_DETAILS: Record<number, ClubDetailsData> = {
-  1: {
-    id: 1,
-    name: 'Robotics & AI Club',
-    category: 'TECHNOLOGY',
-    faculty: 'Computing & Engineering',
-    members: 150,
-    activeSince: 2018,
-    rating: 4.8,
-    president: 'Sarah Connor',
-    meetingDay: 'Wednesdays, 4 PM',
-    coverImage: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=1200&h=400&fit=crop',
-    description: 'The Robotics & AI Club is the premier student organization for technology enthusiasts at EngageX University. We bring together students from Computing, Engineering, and Design faculties to collaborate on innovative projects, ranging from autonomous drones to machine learning models, and competing in national hackathons.',
-    whatWeDo: [
-      'Weekly "Bot-Build" workshops where members learn hands-on hardware assembly and programming.',
-      'Guest lectures from industry leaders from companies like Google, Tesla, and OpenAI.',
-      'Annual "RoboWars" campus championship which draws hundreds of spectators.',
-      'Community outreach STEM programs for local high school students.',
-    ],
-    gallery: [
-      'https://images.unsplash.com/photo-1561557944-6e7860d1a7eb?w=400&h=280&fit=crop',
-      'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=200&h=140&fit=crop',
-      'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=200&h=140&fit=crop',
-    ],
-    events: [
-      {
-        id: 1, day: 15, month: 'MAR', title: 'Intro to Neural Networks',
-        time: '4:00 PM', type: 'Workshop', organizer: 'Robotics & AI Club',
-        location: 'Lab 305', status: 'OPEN',
-        image: 'https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=400&h=200&fit=crop',
-      },
-      {
-        id: 2, day: 22, month: 'MAR', title: 'Robot Battle Arena: Qualifiers',
-        time: '10:00 AM', type: 'Competition', organizer: 'Robotics & AI Club',
-        location: 'Main Hall', status: 'OPEN',
-        image: 'https://images.unsplash.com/photo-1561557944-6e7860d1a7eb?w=400&h=200&fit=crop',
-      },
-      {
-        id: 3, day: 5, month: 'APR', title: 'AI Ethics Panel Discussion',
-        time: '5:30 PM', type: 'Panel', organizer: 'Robotics & AI Club',
-        location: 'Auditorium B', status: 'FILLED',
-        image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=200&fit=crop',
-      },
-      {
-        id: 4, day: 12, month: 'APR', title: 'Drone Racing Workshop',
-        time: '2:00 PM', type: 'Workshop', organizer: 'Robotics & AI Club',
-        location: 'Engineering Rooftop', status: 'OPEN',
-        image: 'https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=400&h=200&fit=crop',
-      },
-      {
-        id: 5, day: 20, month: 'APR', title: 'RoboWars Annual Championship',
-        time: '9:00 AM', type: 'Competition', organizer: 'Robotics & AI Club',
-        location: 'Sports Complex', status: 'REGISTER',
-        image: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=400&h=200&fit=crop',
-      },
-      {
-        id: 6, day: 28, month: 'APR', title: 'Machine Learning Bootcamp',
-        time: '10:00 AM', type: 'Workshop', organizer: 'Robotics & AI Club',
-        location: 'Computer Lab A', status: 'OPEN',
-        image: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=400&h=200&fit=crop',
-      },
-    ],
-  },
-};
-
-// Fallback for clubs without full details
-const DEFAULT_CLUB: ClubDetailsData = CLUB_DETAILS[1];
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const CATEGORY_COLORS: Record<string, string> = {
@@ -183,11 +123,110 @@ function EventCard({ event }: { event: ClubEvent }) {
 
 // ── Main Component ────────────────────────────────────────────────────────
 interface ClubDetailsProps {
-  clubId?: number;
+  clubId: string;
 }
 
-export default function ClubDetails({ clubId = 1 }: ClubDetailsProps) {
-  const club = CLUB_DETAILS[clubId] ?? DEFAULT_CLUB;
+export default function ClubDetails({ clubId }: ClubDetailsProps) {
+  const [club, setClub] = useState<ClubDetailsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+
+  useEffect(() => {
+    async function fetchClub() {
+      try {
+        setLoading(true);
+        // Ensure fetching only if valid ID (assuming string UUID or similar)
+        if (!clubId) return;
+
+        const response = await fetch(`/api/student/clubs/${clubId}`);
+        if (!response.ok) {
+           if (response.status === 404) throw new Error('Club not found');
+           throw new Error('Failed to fetch club details');
+        }
+        
+        const data = await response.json();
+
+        // Map API response (snake_case from DB) to component state (camelCase)
+        // Data likely comes as: { clubid, club_name, category, ... }
+        // We'll map it to ClubDetailsData
+        const mappedClub: ClubDetailsData = {
+          id: data.clubid || data.id,
+          name: data.club_name || data.name || 'Unnamed Club',
+          category: (data.category || 'GENERAL').toUpperCase(),
+          faculty: data.faculty || 'General', // Fallback if missing in DB
+          members: data.active_members || 0,
+          activeSince: data.createdate ? new Date(data.createdate).getFullYear() : new Date().getFullYear(),
+          rating: data.ratings || 0,
+          president: data.president || 'N/A',
+          meetingDay: data.meeting_day || 'TBD',
+          coverImage: data.club_cover_image || 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1200&h=400&fit=crop', // Default cover if missing
+          description: data.club_description || 'No description available.',
+          // Mocking arrays as they might not be in DB yet or format differs
+          whatWeDo: Array.isArray(data.what_we_do) ? data.what_we_do : [],
+          gallery: Array.isArray(data.club_gallery) ? data.club_gallery : [],
+          events: Array.isArray(data.events) ? data.events.map((e: any) => {
+            const dateObj = new Date(e.event_date);
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            let status: 'OPEN' | 'FILLED' | 'REGISTER' = 'OPEN';
+            const s = (e.status || 'OPEN').toUpperCase();
+            if (s === 'FILLED' || s === 'CLOSED') status = 'FILLED';
+            else if (s === 'SOON') status = 'REGISTER';
+            else status = 'OPEN';
+
+            return {
+              id: e.id,
+              day: dateObj.getDate(),
+              month: months[dateObj.getMonth()],
+              title: e.title,
+              time: e.event_time,
+              type: 'General',
+              organizer: data.club_name,
+              location: e.location,
+              status: status,
+              image: e.image
+            };
+          }) : [],
+          socialLinks: {
+            facebook: data.facebook_link || data.facebook || '#',
+            twitter: data.twitter_link || data.twitter || '#',
+            instagram: data.instagram_link || data.instagram || '#',
+            linkedin: data.linkedin_link || data.linkedin || '#',
+          }
+        };
+
+        setClub(mappedClub);
+      } catch (err: unknown) {
+        console.error(err);
+        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchClub();
+  }, [clubId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="text-white/50 animate-pulse">Loading club details...</div>
+      </div>
+    );
+  }
+
+  if (error || !club) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center gap-4 text-center">
+        <div className="text-red-400 mb-2">Error: {error || 'Club not found'}</div>
+        <Link href="/student/all-clubs" className="text-sm text-gray-400 hover:text-white underline">
+          Return to Clubs List
+        </Link>
+      </div>
+    );
+  }
+
   const catClass = CATEGORY_COLORS[club.category] ?? 'bg-gray-500/20 text-gray-300';
 
   return (
@@ -225,7 +264,10 @@ export default function ClubDetails({ clubId = 1 }: ClubDetailsProps) {
             </span>
           </div>
           {/* CTA */}
-          <button className="mt-5 self-start flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-colors shadow-lg shadow-purple-500/20">
+          <button 
+            onClick={() => setShowJoinModal(true)}
+            className="mt-5 self-start flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-colors shadow-lg shadow-purple-500/20"
+          >
             <UserPlus className="w-4 h-4" /> Join This Club
           </button>
         </div>
@@ -266,9 +308,15 @@ export default function ClubDetails({ clubId = 1 }: ClubDetailsProps) {
               Upcoming Club Events
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {club.events.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
+              {club.events.length > 0 ? (
+                club.events.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))
+              ) : (
+                <div className="col-span-full text-center text-gray-400 py-8 text-sm italic">
+                  No upcoming events scheduled.
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -280,7 +328,6 @@ export default function ClubDetails({ clubId = 1 }: ClubDetailsProps) {
             <h3 className="text-white font-semibold text-sm mb-4">Club Info</h3>
             <div className="space-y-3">
               {[
-                { label: 'Faculty', value: club.faculty },
                 { label: 'President', value: club.president },
                 { label: 'Meeting Day', value: club.meetingDay },
               ].map(({ label, value }) => (
@@ -297,18 +344,33 @@ export default function ClubDetails({ clubId = 1 }: ClubDetailsProps) {
             {/* Social links */}
             <div className="flex items-center gap-2">
               {[
-                { Icon: Facebook, color: 'hover:text-blue-400' },
-                { Icon: Twitter, color: 'hover:text-sky-400' },
-                { Icon: Instagram, color: 'hover:text-pink-400' },
-                { Icon: MessageSquare, color: 'hover:text-indigo-400' },
-              ].map(({ Icon, color }, i) => (
-                <button
-                  key={i}
-                  className={`w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 ${color} hover:border-white/20 transition-all`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                </button>
-              ))}
+                { Icon: Facebook, color: 'hover:text-blue-400', link: club.socialLinks?.facebook },
+                { Icon: Twitter, color: 'hover:text-sky-400', link: club.socialLinks?.twitter },
+                { Icon: Instagram, color: 'hover:text-pink-400', link: club.socialLinks?.instagram },
+              ].map(({ Icon, color, link }, i) => {
+                const hasLink = link && link !== '#';
+                return (
+                  hasLink ? (
+                    <Link
+                      key={i}
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 ${color} hover:border-white/20 transition-all`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                    </Link>
+                  ) : (
+                    <div
+                      key={i}
+                      className="w-8 h-8 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center text-gray-600 cursor-not-allowed"
+                      title="Link not available"
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                  )
+                );
+              })}
             </div>
           </div>
 
@@ -317,28 +379,48 @@ export default function ClubDetails({ clubId = 1 }: ClubDetailsProps) {
             <h3 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
               <Images className="w-4 h-4 text-purple-400" /> Club Gallery
             </h3>
+            {club.gallery && club.gallery.length > 0 ? (
             <div className="space-y-2">
               {/* Main large image */}
+              {club.gallery[0] && (
               <div className="rounded-xl overflow-hidden h-36">
                 <img src={club.gallery[0]} alt="Gallery" className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
               </div>
+              )}
               {/* Two smaller images side-by-side */}
               <div className="flex gap-2">
+                {club.gallery[1] && (
                 <div className="flex-1 rounded-xl overflow-hidden h-20">
                   <img src={club.gallery[1]} alt="Gallery" className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
                 </div>
+                )}
+                {club.gallery[2] && (
                 <div className="relative flex-1 rounded-xl overflow-hidden h-20">
                   <img src={club.gallery[2]} alt="Gallery" className="w-full h-full object-cover" />
                   {/* +N overlay */}
+                  {club.gallery.length > 3 && (
                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-xl">
-                    <span className="text-white font-bold text-sm">+8</span>
+                    <span className="text-white font-bold text-sm">+{club.gallery.length - 3}</span>
                   </div>
+                  )}
                 </div>
+                )}
               </div>
             </div>
+            ) : (
+                <div className="text-sm text-gray-400 italic py-4 text-center">No images available</div>
+            )}
           </div>
         </aside>
       </div>
+
+      <JoinClubModal 
+        isOpen={showJoinModal}
+        onClose={() => setShowJoinModal(false)}
+        clubId={club.id}
+        clubName={club.name}
+        category={club.category}
+      />
     </div>
   );
 }

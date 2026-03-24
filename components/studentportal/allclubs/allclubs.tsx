@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Search, Users, Calendar, ChevronLeft, ChevronRight, RefreshCw, ExternalLink, UserPlus, LayoutGrid, List } from 'lucide-react';
+import { Search, Users, ChevronLeft, ChevronRight, RefreshCw, ExternalLink, UserPlus, LayoutGrid, List } from 'lucide-react';
 import Link from 'next/link';
 import JoinClubModal from './JoinClubModal';
 
@@ -15,6 +15,15 @@ interface Club {
   events_count: number; // Mapped from events
   status?: string; // e.g., 'Auditions Open'
   image_url: string; // Mapped from image
+}
+
+interface DbClub {
+  clubid: string;
+  club_name: string;
+  category: string;
+  club_description: string;
+  active_members: number;
+  club_cover_image: string;
 }
 
 // ── Data ──────────────────────────────────────────────────────────────────
@@ -72,12 +81,6 @@ function ClubCard({ club, onJoin }: { club: Club; onJoin: (club: Club) => void }
           <span className="flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5" />
             <span className="text-gray-300 font-medium">{club.members_count}+ Members</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5" />
-            <span className="text-gray-300 font-medium">
-              {club.events_count} Upcoming Event{club.events_count !== 1 ? 's' : ''}
-            </span>
           </span>
         </div>
 
@@ -150,7 +153,16 @@ export default function AllClubs() {
         const response = await fetch('/api/student/clubs');
         if (response.ok) {
           const data = await response.json();
-          setClubs(data);
+          const mappedClubs = data.map((club: DbClub) => ({
+            id: club.clubid,
+            name: club.club_name,
+            category: club.category,
+            description: club.club_description,
+            members_count: club.active_members,
+            events_count: 0,
+            image_url: club.club_cover_image,
+          }));
+          setClubs(mappedClubs);
         }
       } catch (error) {
         console.error('Failed to fetch clubs', error);
@@ -304,7 +316,6 @@ export default function AllClubs() {
                   
                   <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
                     <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> {club.members_count}+ members</span>
-                    <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {club.events_count} upcoming events</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -352,6 +363,7 @@ export default function AllClubs() {
       <JoinClubModal 
         isOpen={showJoinModal}
         onClose={() => setShowJoinModal(false)}
+        clubId={selectedClub?.id || ''}
         clubName={selectedClub?.name || ''}
         category={selectedClub?.category || ''}
       />

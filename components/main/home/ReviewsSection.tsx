@@ -1,40 +1,94 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { Star, Quote } from 'lucide-react';
 import { Space_Grotesk } from 'next/font/google';
 
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], weight: ['700'] });
 
-const REVIEWS = [
-  {
-    name: "Alex Morgan",
-    department: "Computer Science, Year 2",
-    text: "EngageX has completely transformed my university experience. Finding clubs that match my interests in robotics was so easy, and the events are always top-notch!",
-    rating: 5,
-    image: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=60&q=80",
-    time: "2 Weeks Ago"
-  },
-  {
-    name: "Sarah Jenkins",
-    department: "Fine Arts, Year 3",
-    text: "I love how organized everything is. From joining the Music Society to tracking upcoming concerts, this platform handles it all seamlessly. Highly recommended!",
-    rating: 4.5,
-    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=60&q=80",
-    time: "1 Week Ago"
-  },
-  {
-    name: "David Chen",
-    department: "Business Admin, Year 4",
-    text: "As a club president, managing members and events used to be chaos. This system centralized everything and increased our member engagement significantly.",
-    rating: 5,
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=60&q=80",
-    time: "3 Days Ago"
-  }
-];
+interface Review {
+  id: string;
+  name: string;
+  department: string;
+  text: string;
+  rating: number;
+  image: string;
+  time: string;
+}
+
+interface ReviewResponse {
+  id: string;
+  name: string;
+  department: string;
+  text: string;
+  rating: number;
+  image: string;
+  review_added_date: string;
+}
 
 export default function ReviewsSection() {
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        const response = await fetch('/api/main/home/reviews');
+        if (!response.ok) {
+          throw new Error('Failed to fetch reviews');
+        }
+        const data: ReviewResponse[] = await response.json();
+        
+        const formattedReviews: Review[] = data.map((review) => ({
+          id: review.id,
+          name: review.name,
+          department: review.department,
+          text: review.text,
+          rating: review.rating,
+          image: review.image,
+          time: getTimeAgo(new Date(review.review_added_date))
+        }));
+
+        setReviews(formattedReviews);
+      } catch (error) {
+        console.error('Error loading reviews:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReviews();
+  }, []);
+
+  function getTimeAgo(date: Date) {
+     const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+     let interval = seconds / 31536000;
+     if (interval > 1) return Math.floor(interval) + " Years Ago";
+     interval = seconds / 2592000;
+     if (interval > 1) return Math.floor(interval) + " Months Ago";
+     interval = seconds / 604800;
+     if (interval > 1) return Math.floor(interval) + " Weeks Ago";
+     interval = seconds / 86400;
+     if (interval > 1) return Math.floor(interval) + " Days Ago";
+     interval = seconds / 3600;
+     if (interval > 1) return Math.floor(interval) + " Hours Ago";
+     interval = seconds / 60;
+     if (interval > 1) return Math.floor(interval) + " Minutes Ago";
+     return "Just Now";
+  }
+
+  if (loading) {
+    return (
+      <section className="relative py-24 bg-[#0b0515] overflow-hidden min-h-[500px] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+          <p className="text-purple-400/80 font-medium animate-pulse">Loading verified reviews...</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="relative py-24 bg-[#0b0515] overflow-hidden">
       {/* Innovative Ripple Background */}
@@ -69,7 +123,7 @@ export default function ReviewsSection() {
               </div>
               <span className="text-white/60 font-medium ml-2">TrustWave Reviews</span>
             </div>
-            <p className="text-white/40 text-sm font-medium">Based On 3,450+ Verified Students</p>
+            <p className="text-white/40 text-sm font-medium">Based On {reviews.length} Verified Reviews</p>
           </div>
         </div>
 
@@ -90,9 +144,14 @@ export default function ReviewsSection() {
 
           {/* Right Side Cards Grid */}
           <div className="lg:w-3/4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {REVIEWS.map((review, index) => (
+            {reviews.length === 0 && !loading && (
+              <div className="text-white/60 col-span-full text-center py-10">
+                No reviews yet. Check back later!
+              </div>
+            )}
+            {reviews.map((review) => (
               <div
-                key={index}
+                key={review.id}
                 className="group relative bg-[#130a21]/40 backdrop-blur-xl border border-white/[0.05] rounded-[2.5rem] p-8 transition-all duration-500 hover:-translate-y-2 hover:bg-white/[0.04] hover:border-white/10 flex flex-col h-full"
               >
                 <p className="text-white/80 text-lg leading-relaxed mb-8 flex-1">

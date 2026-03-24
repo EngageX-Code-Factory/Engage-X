@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Calendar, MapPin, Clock, 
   Users, CheckCircle2, ChevronRight, Send, AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
-import { Event, CATEGORY_COLORS, FACULTY_COLORS } from './data';
+import { Event, CATEGORY_COLORS } from './data';
 
 interface RegistrationProps {
   event: Event;
@@ -14,26 +14,75 @@ interface RegistrationProps {
 
 export default function Registration({ event }: RegistrationProps) {
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    name: 'Alex Morgan',
-    studentId: 'ST-2024-001',
-    email: 'alex.morgan@university.edu',
+    name: 'Loading...',
+    studentId: 'Loading...',
+    email: 'Loading...',
     phone: '',
     department: 'Computing',
     dietary: '',
     note: ''
   });
 
-  const catClass = CATEGORY_COLORS[event.category] ?? 'bg-gray-500/20 text-gray-300';
-  const facColor = FACULTY_COLORS[event.organizerFaculty] ?? 'text-purple-400';
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch('/api/student/profile');
+        if (res.ok) {
+          const data = await res.json();
+          setFormData(prev => ({
+            ...prev,
+            name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
+            studentId: data.student_id || '',
+            email: data.email || '',
+            phone: data.mobile || ''
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile', err);
+      }
+    };
+    fetchProfile();
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const catClass = CATEGORY_COLORS[event.category] ?? 'bg-gray-500/20 text-gray-300';
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitted(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 800);
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/student/my-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: event.id,
+          club_id: event.clubId,
+          full_name: formData.name,
+          student_id: formData.studentId,
+          email: formData.email,
+          phone_number: formData.phone,
+          dietary_requirements: formData.dietary,
+          special_notes: formData.note
+        })
+      });
+
+      if (res.ok) {
+        setIsSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to register for event');
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (isSubmitted) {
@@ -160,7 +209,7 @@ export default function Registration({ event }: RegistrationProps) {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-widest leading-none mb-1">Organizer</p>
-                    <p className={`text-sm font-bold ${facColor}`}>{event.organizer}</p>
+                    <p className="text-sm font-bold text-purple-400">{event.organizer}</p>
                   </div>
                 </div>
              </div>
@@ -255,12 +304,19 @@ export default function Registration({ event }: RegistrationProps) {
               </p>
             </div>
 
+            {error && (
+              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm italic text-center mb-6">
+                {error}
+              </div>
+            )}
+
             <button 
               type="submit"
-              className="w-full h-16 rounded-[1.5rem] bg-purple-600 text-white font-black text-lg shadow-xl shadow-purple-900/40 hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 group"
+              disabled={loading}
+              className="w-full h-16 rounded-[1.5rem] bg-purple-600 text-white font-black text-lg shadow-xl shadow-purple-900/40 hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Confirm Registration
-              <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              {loading ? 'Registering...' : 'Confirm Registration'}
+              {!loading && <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
             </button>
           </form>
         </div>

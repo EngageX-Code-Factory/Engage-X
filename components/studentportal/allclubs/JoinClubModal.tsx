@@ -1,36 +1,86 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, UserPlus, Send, CheckCircle2, ChevronRight, Info } from 'lucide-react';
 
 interface JoinClubModalProps {
   isOpen: boolean;
   onClose: () => void;
+  clubId: string;
   clubName: string;
   category: string;
 }
 
-export default function JoinClubModal({ isOpen, onClose, clubName, category }: JoinClubModalProps) {
+export default function JoinClubModal({ isOpen, onClose, clubId, clubName, category }: JoinClubModalProps) {
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    name: 'Alex Morgan',
-    studentId: 'ST-2024-001',
+    name: 'Loading...',
+    studentId: 'Loading...',
     interests: '',
     motivation: '',
     experience: ''
   });
 
+  useEffect(() => {
+    if (isOpen) {
+      const fetchProfile = async () => {
+        try {
+          const res = await fetch('/api/student/profile');
+          if (res.ok) {
+            const data = await res.json();
+            setFormData(prev => ({
+              ...prev,
+              name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
+              studentId: data.student_id || ''
+            }));
+          }
+        } catch (err) {
+          console.error('Failed to fetch profile', err);
+        }
+      };
+      fetchProfile();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setTimeout(() => {
-      setIsSubmitted(true);
-    }, 800);
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/student/my-clubs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          club_id: clubId,
+          full_name: formData.name,
+          student_id: formData.studentId,
+          interests: formData.interests,
+          reason_to_join: formData.motivation
+        })
+      });
+
+      if (res.ok) {
+        setIsSubmitted(true);
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to submit application');
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => {
     setIsSubmitted(false);
+    setError('');
     onClose();
   };
 
@@ -152,12 +202,19 @@ export default function JoinClubModal({ isOpen, onClose, clubName, category }: J
                   </p>
                 </div>
 
+                {error && (
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs text-center">
+                    {error}
+                  </div>
+                )}
+
                 <button 
                   type="submit"
-                  className="w-full py-4 rounded-2xl bg-purple-600 text-white font-black text-base shadow-lg shadow-purple-900/30 hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
+                  disabled={loading}
+                  className="w-full py-4 rounded-2xl bg-purple-600 text-white font-black text-base shadow-lg shadow-purple-900/30 hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Submit Application
-                  <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  {loading ? 'Submitting...' : 'Submit Application'}
+                  {!loading && <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
                 </button>
               </form>
             </div>
