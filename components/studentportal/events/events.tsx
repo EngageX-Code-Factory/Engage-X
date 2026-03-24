@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
   Search, Clock, MapPin, ChevronLeft, ChevronRight,
-  RefreshCw, Calendar, Users, Filter, LayoutGrid, List
+  RefreshCw, Calendar, Users, Filter, LayoutGrid, List,
+  CheckCircle2
 } from 'lucide-react';
 import Link from 'next/link';
 import { 
@@ -33,8 +34,12 @@ function EventCard({ event }: { event: Event }) {
           <span className="block text-gray-300 text-[10px] font-medium tracking-widest mt-0.5">{event.month}</span>
         </div>
         {/* Status badge — top left */}
-        <span className={`absolute top-3 left-3 text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full backdrop-blur-sm ${STATUS_STYLES[event.status]}`}>
-          {event.status}
+        <span className={`absolute top-3 left-3 text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full backdrop-blur-sm ${
+          event.isRegistered 
+            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
+            : STATUS_STYLES[event.status]
+        }`}>
+          {event.isRegistered ? 'REGISTERED' : event.status}
         </span>
       </div>
 
@@ -79,7 +84,12 @@ function EventCard({ event }: { event: Event }) {
         <div className="flex-1" />
 
         {/* Register Button */}
-        {event.status === 'FILLED' ? (
+        {event.isRegistered ? (
+          <button disabled className="mt-4 w-full py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-bold cursor-default flex items-center justify-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            Registered
+          </button>
+        ) : event.status === 'FILLED' ? (
           <button disabled className="mt-4 w-full py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-500 text-sm font-medium cursor-not-allowed">
             Waitlist Only
           </button>
@@ -159,7 +169,9 @@ export default function Events() {
             category: (Array.isArray(e.clubs) ? e.clubs[0]?.category : e.clubs?.category) || 'OTHER',
             organizer: (Array.isArray(e.clubs) ? e.clubs[0]?.club_name : e.clubs?.club_name) || 'Unknown Organization',
             image: e.image,
-            attendees: e.attendees
+            attendees: e.attendees,
+            clubId: e.club_id,
+            isRegistered: !!e.is_registered
           };
         });
         setEvents(mapped);
@@ -315,11 +327,19 @@ export default function Events() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-white font-semibold text-sm">{event.title}</h3>
-                    <span className={`text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full ${CATEGORY_COLORS[event.category]}`}>
-                      {event.category}
+                    <span className={`text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full ${
+                      event.isRegistered 
+                        ? 'bg-emerald-500 text-white' 
+                        : CATEGORY_COLORS[event.category]
+                    }`}>
+                      {event.isRegistered ? 'REGISTERED' : event.category}
                     </span>
-                    <span className={`text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full ${STATUS_STYLES[event.status]}`}>
-                      {event.status}
+                    <span className={`text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full ${
+                      event.isRegistered 
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                        : STATUS_STYLES[event.status]
+                    }`}>
+                      {event.isRegistered ? 'JOINED' : event.status}
                     </span>
                   </div>
                   <p className="text-xs mt-1">
@@ -332,7 +352,12 @@ export default function Events() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 shrink-0 min-w-[120px]">
-                  {event.status === 'FILLED' ? (
+                  {event.isRegistered ? (
+                    <button disabled className="w-full py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold cursor-default flex items-center justify-center gap-2">
+                       <CheckCircle2 className="w-3 h-3" />
+                       Registered
+                    </button>
+                  ) : event.status === 'FILLED' ? (
                     <button disabled className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-gray-500 text-xs font-medium cursor-not-allowed">
                       Waitlist
                     </button>

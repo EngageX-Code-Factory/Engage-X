@@ -9,25 +9,78 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-// Mocked event markers (realistically these would come from an API)
-const EVENT_MARKERS: Record<string, string> = {
-  '2026-02-15': 'ring-2 ring-purple-500 text-white',
-  '2026-02-20': 'ring-2 ring-white text-white',
-  '2026-02-25': 'ring-2 ring-emerald-500 text-white',
-  // March 2026
-  '2026-03-15': 'ring-2 ring-purple-500 text-white',
-  '2026-03-20': 'ring-2 ring-white text-white',
-  '2026-03-25': 'ring-2 ring-emerald-500 text-white',
+const CATEGORY_COLOR_MAP: Record<string, string> = {
+  TECHNOLOGY:    'bg-indigo-500',
+  'ART & DESIGN':'bg-purple-500',
+  MUSIC:         'bg-pink-500',
+  ACADEMIC:      'bg-amber-500',
+  BUSINESS:      'bg-violet-500',
+  SCIENCE:       'bg-emerald-500',
 };
 
-const upcomingEvents = [
-  { date: 'MAR 15', title: 'Hackathon 2026', color: 'bg-purple-500' },
-  { date: 'MAR 20', title: 'Art Workshop', color: 'bg-indigo-500' },
-  { date: 'MAR 25', title: 'Resume Review', color: 'bg-emerald-500' },
-];
+const CATEGORY_RING_MAP: Record<string, string> = {
+  TECHNOLOGY:    'ring-2 ring-indigo-500 text-white',
+  'ART & DESIGN':'ring-2 ring-purple-500 text-white',
+  MUSIC:         'ring-2 ring-pink-500 text-white',
+  ACADEMIC:      'ring-2 ring-amber-500 text-white',
+  BUSINESS:      'ring-2 ring-violet-500 text-white',
+  SCIENCE:       'ring-2 ring-emerald-500 text-white',
+};
 
-export default function CalendarSidebar() {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 1)); // Start at March 2026 for consistency with design
+interface CalendarSidebarProps {
+  registeredEvents?: any[];
+}
+
+export default function CalendarSidebar({ registeredEvents = [] }: CalendarSidebarProps) {
+  // Use current date as initial state instead of hardcoded March 2026
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Helper for safe date parsing (handles YYYY-MM-DD as local)
+  const parseDateLocal = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    // Replace hyphens with slashes to force local interpretation in many browsers
+    // or manually split and create
+    const parts = dateStr.split('T')[0].split('-');
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    }
+    return new Date(dateStr);
+  };
+
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+
+  // Generate EVENT_MARKERS from registeredEvents
+  const EVENT_MARKERS: Record<string, string> = {};
+  registeredEvents.forEach(evt => {
+    if (evt.event_date) {
+      const date = parseDateLocal(evt.event_date);
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      
+      EVENT_MARKERS[dateStr] = CATEGORY_RING_MAP[evt.category] || 'ring-2 ring-white text-white';
+    }
+  });
+
+  // Generate upcomingEvents list from registeredEvents
+  const upcomingEvents = registeredEvents
+    .map(evt => {
+      const date = parseDateLocal(evt.event_date);
+      const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+      return {
+        id: evt.id,
+        date: `${monthNames[date.getMonth()]} ${date.getDate()}`,
+        rawDate: date,
+        title: evt.title,
+        color: CATEGORY_COLOR_MAP[evt.category] || 'bg-gray-500'
+      };
+    })
+    .filter(evt => {
+        const d = new Date(evt.rawDate);
+        d.setHours(0,0,0,0);
+        return d.getTime() >= todayMidnight.getTime();
+    })
+    .sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime())
+    .slice(0, 6); // Increase visibility to 6 events
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();

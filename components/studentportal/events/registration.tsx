@@ -60,6 +60,7 @@ export default function Registration({ event }: RegistrationProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           event_id: event.id,
+          club_id: event.clubId,
           full_name: formData.name,
           student_id: formData.studentId,
           email: formData.email,
@@ -303,12 +304,19 @@ export default function Registration({ event }: RegistrationProps) {
               </p>
             </div>
 
+            {error && (
+              <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm italic text-center mb-6">
+                {error}
+              </div>
+            )}
+
             <button 
               type="submit"
-              className="w-full h-16 rounded-[1.5rem] bg-purple-600 text-white font-black text-lg shadow-xl shadow-purple-900/40 hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 group"
+              disabled={loading}
+              className="w-full h-16 rounded-[1.5rem] bg-purple-600 text-white font-black text-lg shadow-xl shadow-purple-900/40 hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Confirm Registration
-              <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              {loading ? 'Registering...' : 'Confirm Registration'}
+              {!loading && <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
             </button>
           </form>
         </div>

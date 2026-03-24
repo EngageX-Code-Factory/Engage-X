@@ -1,4 +1,4 @@
-﻿export interface Event {
+export interface Event {
   id: string;
   date: string;
   month: string;
@@ -11,6 +11,8 @@
   organizer: string;
   image: string;
   attendees: number;
+  clubId?: string;
+  isRegistered?: boolean;
 }
 
 export interface RawEvent {
@@ -23,6 +25,7 @@ export interface RawEvent {
   image: string;
   status: string;
   club_id: string;
+  is_registered?: boolean;
   clubs: {
     club_name: string;
     category: string;

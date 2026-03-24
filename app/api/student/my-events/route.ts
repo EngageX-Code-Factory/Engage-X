@@ -52,7 +52,20 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { event_id, club_id, full_name, student_id, email, phone_number, dietary_requirements, special_notes } = body;
+    let { event_id, club_id, full_name, student_id, email, phone_number, dietary_requirements, special_notes } = body;
+
+    // If club_id is missing, try to fetch it from the events table
+    if (!club_id && event_id) {
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('club_id')
+        .eq('id', event_id)
+        .single();
+      
+      if (!eventError && eventData) {
+        club_id = eventData.club_id;
+      }
+    }
 
     const { error } = await supabase
       .from('my_events')
