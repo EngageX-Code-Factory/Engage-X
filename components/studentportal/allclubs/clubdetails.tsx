@@ -417,6 +417,7 @@ export default function ClubDetails({ clubId }: ClubDetailsProps) {
       <JoinClubModal 
         isOpen={showJoinModal}
         onClose={() => setShowJoinModal(false)}
+        clubId={club.id}
         clubName={club.name}
         category={club.category}
       />
