@@ -4,8 +4,25 @@ import MySchedule from './my-schedule';
 import CalendarSidebar from './calendar-sidebar';
 import RecentActivity from './recent-activity';
 import EmergencyAlert from './emergency-alert';
+import { createClient } from '@/lib/supabase/server';
 
-export default function Dashboard() {
+export default async function Dashboard() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  let firstName = 'Student';
+  if (user) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('first_name')
+      .eq('id', user.id)
+      .single();
+    
+    if (data?.first_name) {
+      firstName = data.first_name;
+    }
+  }
+
   return (
     <div className="max-w-screen-2xl mx-auto px-6 py-8">
       <div className="flex gap-6">
@@ -16,7 +33,7 @@ export default function Dashboard() {
             <div>
               <h1 className="text-4xl font-bold text-white">
                 Welcome back,{' '}
-                <span className="text-purple-400">Alex!</span>
+                <span className="text-purple-400">{firstName}!</span>
               </h1>
               <p className="text-gray-400 mt-2 text-base">
                 Here's what's happening in your campus community today.

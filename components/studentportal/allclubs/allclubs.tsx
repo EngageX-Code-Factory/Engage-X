@@ -363,6 +363,7 @@ export default function AllClubs() {
       <JoinClubModal 
         isOpen={showJoinModal}
         onClose={() => setShowJoinModal(false)}
+        clubId={selectedClub?.id || ''}
         clubName={selectedClub?.name || ''}
         category={selectedClub?.category || ''}
       />

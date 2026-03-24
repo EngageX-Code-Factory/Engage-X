@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Calendar, MapPin, Clock, 
   Users, CheckCircle2, ChevronRight, Send, AlertCircle
@@ -14,25 +14,74 @@ interface RegistrationProps {
 
 export default function Registration({ event }: RegistrationProps) {
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    name: 'Alex Morgan',
-    studentId: 'ST-2024-001',
-    email: 'alex.morgan@university.edu',
+    name: 'Loading...',
+    studentId: 'Loading...',
+    email: 'Loading...',
     phone: '',
     department: 'Computing',
     dietary: '',
     note: ''
   });
 
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch('/api/student/profile');
+        if (res.ok) {
+          const data = await res.json();
+          setFormData(prev => ({
+            ...prev,
+            name: `${data.first_name || ''} ${data.last_name || ''}`.trim(),
+            studentId: data.student_id || '',
+            email: data.email || '',
+            phone: data.mobile || ''
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile', err);
+      }
+    };
+    fetchProfile();
+  }, []);
+
   const catClass = CATEGORY_COLORS[event.category] ?? 'bg-gray-500/20 text-gray-300';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitted(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 800);
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/student/my-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: event.id,
+          full_name: formData.name,
+          student_id: formData.studentId,
+          email: formData.email,
+          phone_number: formData.phone,
+          dietary_requirements: formData.dietary,
+          special_notes: formData.note
+        })
+      });
+
+      if (res.ok) {
+        setIsSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        const errData = await res.json();
+        setError(errData.error || 'Failed to register for event');
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (isSubmitted) {
