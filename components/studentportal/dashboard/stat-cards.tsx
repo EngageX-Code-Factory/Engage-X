@@ -58,9 +58,17 @@ const tiers: Tier[] = [
   { id: 'platinum', name: 'Platinum', minPoints: 1000, color: 'text-indigo-400', border: 'border-indigo-500/20', bg: 'bg-indigo-500/10', icon: <Award className="w-6 h-6 text-indigo-400" /> },
 ];
 
-export default function StatCards() {
+export default function StatCards({ 
+  eventsCount = 0, 
+  clubsCount = 0, 
+  points = 0 
+}: { 
+  eventsCount?: number; 
+  clubsCount?: number; 
+  points?: number 
+}) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const currentPoints = 450;
+  const currentPoints = points;
   const currentTier = tiers.find((t, i) => currentPoints >= t.minPoints && (!tiers[i+1] || currentPoints < tiers[i+1].minPoints)) || tiers[0];
   const nextTier = tiers[tiers.indexOf(currentTier) + 1];
 
@@ -73,7 +81,7 @@ export default function StatCards() {
               <Calendar className="w-5 h-5 text-indigo-400" />
             </div>
           }
-          value={12}
+          value={eventsCount}
           label="Events Attended"
         />
         <StatCard
@@ -82,7 +90,7 @@ export default function StatCards() {
               <Users className="w-5 h-5 text-purple-400" />
             </div>
           }
-          value={3}
+          value={clubsCount}
           label="Clubs Joined"
         />
         <StatCard
