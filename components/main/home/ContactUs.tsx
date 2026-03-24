@@ -29,7 +29,7 @@ export default function ContactUs() {
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                href="/signup"
+                href="/auth/sign-up"
                 className="w-full sm:w-auto px-8 py-4 bg-white text-black font-bold rounded-2xl hover:bg-gray-100 transition-colors text-lg"
               >
                 Get Started Today

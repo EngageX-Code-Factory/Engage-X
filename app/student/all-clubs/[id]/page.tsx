@@ -17,5 +17,5 @@ export default function ClubDetailsPage({ params }: Props) {
 
 async function ClubDetailsWrapper({ params }: Props) {
   const { id } = await params;
-  return <ClubDetails clubId={parseInt(id)} />;
+  return <ClubDetails clubId={id} />;
 }
