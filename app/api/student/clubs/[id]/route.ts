@@ -15,7 +15,10 @@ export async function GET(
 
         const { data: club, error } = await supabase
             .from('clubs')
-            .select('*')
+            .select(`
+                *,
+                events (*)
+            `)
             .eq('clubid', id)
             .single();
 

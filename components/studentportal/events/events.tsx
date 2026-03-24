@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Search, Clock, MapPin, ChevronLeft, ChevronRight,
   RefreshCw, Calendar, Users, Filter, LayoutGrid, List
 } from 'lucide-react';
 import Link from 'next/link';
 import { 
-  Event, allEvents, 
+  Event, RawEvent,
   CATEGORIES, STATUS_OPTIONS, 
-  CATEGORY_COLORS, STATUS_STYLES, FACULTY_COLORS 
+  CATEGORY_COLORS, STATUS_STYLES
 } from './data';
 
 const ITEMS_PER_PAGE = 9;
@@ -17,7 +17,6 @@ const ITEMS_PER_PAGE = 9;
 // ── Event Card ─────────────────────────────────────────────────────────────
 function EventCard({ event }: { event: Event }) {
   const catClass  = CATEGORY_COLORS[event.category] ?? 'bg-gray-500/20 text-gray-300';
-  const facColor  = FACULTY_COLORS[event.organizerFaculty] ?? 'text-purple-400';
 
   return (
     <div className="bg-white/3 border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/30 hover:-translate-y-1 transition-all duration-300 group flex flex-col">
@@ -54,7 +53,7 @@ function EventCard({ event }: { event: Event }) {
           <Users className="w-3.5 h-3.5 text-gray-500 shrink-0" />
           <p className="text-xs">
             <span className="text-gray-400">By </span>
-            <span className={`font-semibold ${facColor}`}>{event.organizer}</span>
+            <span className="font-semibold text-purple-400">{event.organizer}</span>
           </p>
         </div>
 
@@ -134,16 +133,54 @@ export default function Events() {
   const [status, setStatus]     = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [view, setView] = useState<'grid' | 'list'>('grid');
+  
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/student/events');
+        if (!res.ok) throw new Error('Failed to fetch events');
+        const data: RawEvent[] = await res.json();
+        const mapped = data.map((e: RawEvent) => {
+          const dateObj = new Date(e.event_date);
+          const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+          return {
+            id: e.id,
+            title: e.title,
+            date: dateObj.getDate().toString().padStart(2, '0'),
+            month: months[dateObj.getMonth()],
+            year: dateObj.getFullYear(),
+            time: e.event_time,
+            location: e.location,
+            status: e.status,
+            category: (Array.isArray(e.clubs) ? e.clubs[0]?.category : e.clubs?.category) || 'OTHER',
+            organizer: (Array.isArray(e.clubs) ? e.clubs[0]?.club_name : e.clubs?.club_name) || 'Unknown Organization',
+            image: e.image,
+            attendees: e.attendees
+          };
+        });
+        setEvents(mapped);
+      } catch (error) {
+        console.error("Error loading events:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEvents();
+  }, []);
 
   const filtered = useMemo(() => {
-    return allEvents.filter((e) => {
+    return events.filter((e) => {
       const matchSearch   = e.title.toLowerCase().includes(search.toLowerCase())
         || e.organizer.toLowerCase().includes(search.toLowerCase());
       const matchCategory = category === 'All' || e.category === category;
       const matchStatus   = status  === 'All'  || e.status   === status;
       return matchSearch && matchCategory && matchStatus;
     });
-  }, [search, category, status]);
+  }, [search, category, status, events]); // Added events to dependency array
 
   const paginated = filtered.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -155,6 +192,15 @@ export default function Events() {
   };
 
   const isFiltered = search || category !== 'All' || status !== 'All';
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] text-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mr-4"></div>
+        <p>Loading events...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-screen-2xl mx-auto px-6 py-8">
@@ -278,7 +324,7 @@ export default function Events() {
                   </div>
                   <p className="text-xs mt-1">
                     <span className="text-gray-400">By </span>
-                    <span className={`font-semibold ${FACULTY_COLORS[event.organizerFaculty] ?? 'text-purple-400'}`}>{event.organizer}</span>
+                    <span className="font-semibold text-purple-400">{event.organizer}</span>
                   </p>
                   <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
                     <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {event.date} {event.month} • {event.time}</span>

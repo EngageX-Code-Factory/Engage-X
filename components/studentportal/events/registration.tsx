@@ -6,7 +6,7 @@ import {
   Users, CheckCircle2, ChevronRight, Send, AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
-import { Event, CATEGORY_COLORS, FACULTY_COLORS } from './data';
+import { Event, CATEGORY_COLORS } from './data';
 
 interface RegistrationProps {
   event: Event;
@@ -25,7 +25,6 @@ export default function Registration({ event }: RegistrationProps) {
   });
 
   const catClass = CATEGORY_COLORS[event.category] ?? 'bg-gray-500/20 text-gray-300';
-  const facColor = FACULTY_COLORS[event.organizerFaculty] ?? 'text-purple-400';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,7 +159,7 @@ export default function Registration({ event }: RegistrationProps) {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-widest leading-none mb-1">Organizer</p>
-                    <p className={`text-sm font-bold ${facColor}`}>{event.organizer}</p>
+                    <p className="text-sm font-bold text-purple-400">{event.organizer}</p>
                   </div>
                 </div>
              </div>

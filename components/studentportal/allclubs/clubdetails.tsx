@@ -11,7 +11,7 @@ import JoinClubModal from './JoinClubModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface ClubEvent {
-  id: number;
+  id: string;
   day: number;
   month: string;
   title: string;
@@ -165,7 +165,28 @@ export default function ClubDetails({ clubId }: ClubDetailsProps) {
           // Mocking arrays as they might not be in DB yet or format differs
           whatWeDo: Array.isArray(data.what_we_do) ? data.what_we_do : [],
           gallery: Array.isArray(data.club_gallery) ? data.club_gallery : [],
-          events: [], // Events will be fetched when the API supports it
+          events: Array.isArray(data.events) ? data.events.map((e: any) => {
+            const dateObj = new Date(e.event_date);
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            let status: 'OPEN' | 'FILLED' | 'REGISTER' = 'OPEN';
+            const s = (e.status || 'OPEN').toUpperCase();
+            if (s === 'FILLED' || s === 'CLOSED') status = 'FILLED';
+            else if (s === 'SOON') status = 'REGISTER';
+            else status = 'OPEN';
+
+            return {
+              id: e.id,
+              day: dateObj.getDate(),
+              month: months[dateObj.getMonth()],
+              title: e.title,
+              time: e.event_time,
+              type: 'General',
+              organizer: data.club_name,
+              location: e.location,
+              status: status,
+              image: e.image
+            };
+          }) : [],
           socialLinks: {
             facebook: data.facebook_link || data.facebook || '#',
             twitter: data.twitter_link || data.twitter || '#',
