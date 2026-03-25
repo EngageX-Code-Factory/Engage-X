@@ -27,15 +27,15 @@ export async function POST(req: Request) {
           )
         `)
         .eq('user_id', user.id);
-        
+
       if (data && data.length > 0) {
         const studentEvents = data.map((item: any) => item.events).filter(Boolean);
-        
+
         if (studentEvents.length > 0) {
           const eventsListText = studentEvents
             .map((e: any) => `- "${e.title}" on ${e.event_date} at ${e.event_time} (ID: ${e.id})`)
             .join('\n');
-            
+
           fixedEventsPrompt = `The student is officially registered for these exact events:\n${eventsListText}\n\nYou MUST place these exact events on their precise dates and times in the schedule.`;
         }
       }
@@ -92,6 +92,7 @@ Return a strict JSON object explicitly matching the required schema. Ensure the 
                   properties: {
                     id: { type: Type.NUMBER },
                     time: { type: Type.STRING, description: "E.g., '10:00 AM'" },
+                    endTime: { type: Type.STRING, description: "Intelligently estimate the end time based on the event type. E.g., '11:30 AM'" },
                     title: { type: Type.STRING },
                     type: { type: Type.STRING, description: "Must be exactly one of: 'club', 'academic', 'event', 'featured'" },
                     recommended: { type: Type.BOOLEAN, nullable: true },
@@ -118,12 +119,12 @@ Return a strict JSON object explicitly matching the required schema. Ensure the 
     };
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: scheduleSchema,
-        }
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: scheduleSchema,
+      }
     });
 
     const resultText = response.text || "{}";

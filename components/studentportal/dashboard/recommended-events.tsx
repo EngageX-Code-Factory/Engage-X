@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Clock, Loader2, Calendar } from 'lucide-react';
+import { Clock, Loader2, Calendar, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 // Helper function to format date
@@ -108,6 +108,13 @@ export default function RecommendedEvents() {
                     <Clock className="w-3.5 h-3.5 shrink-0" />
                     <span className="line-clamp-1">{event.event_time}</span>
                   </div>
+
+                  {event.aiRecommenderReason && (
+                    <div className="mt-4 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-200 leading-relaxed flex gap-2">
+                      <Sparkles className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                      <p className="line-clamp-3">{event.aiRecommenderReason}</p>
+                    </div>
+                  )}
 
                   <div className="mt-auto pt-4 flex gap-2">
                     <Link 

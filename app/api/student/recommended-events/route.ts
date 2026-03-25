@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { GoogleGenAI, Type, Schema } from '@google/genai';
 
 // Helper to normalize location strings
 const normalizeLocation = (loc: string | null | undefined) => {
@@ -184,11 +185,8 @@ export async function GET() {
       return new Date(a.event_date).getTime() - new Date(b.event_date).getTime();
     });
 
-    // Cold Start inherently works because non-history users will have score based purely on Location, Recency, and Popularity!
-    // And if everything is 0, they sort by Date.
-
-    // 7. Diversity Filter
-    const topRecommendations = [];
+    // 7. Filter top 6 candidates mathematically first
+    const candidateEvents: any[] = [];
     const categoryCounts: Record<string, number> = {};
     
     for (const event of scoredEvents) {
@@ -197,15 +195,80 @@ export async function GET() {
       const cat = event.clubs?.category?.toUpperCase() || 'GENERAL';
       const count = categoryCounts[cat] || 0;
       
-      if (count < 2) {
-        topRecommendations.push(event);
+      if (count < 3) { // relaxed diversity for candidate pool
+        candidateEvents.push(event);
         categoryCounts[cat] = count + 1;
       }
 
-      if (topRecommendations.length === 3) break;
+      if (candidateEvents.length === 6) break;
     }
 
-    return NextResponse.json(topRecommendations);
+    if (candidateEvents.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    // 8. AI Semantic Pipeline (Gemini)
+    try {
+      const ai = new GoogleGenAI({});
+
+      const promptContext = `
+Student Profiling History:
+Past engaging categories: ${JSON.stringify(categoryFreq)}
+Home Location Keywords: ${Array.from(addressTokens).join(', ')}
+
+Available highly-scored upcoming events:
+${candidateEvents.map(e => `- ID: ${e.id} | Title: ${e.title} | Category: ${e.clubs?.category} | Date: ${e.event_date} | Location: ${e.location}`).join('\n')}
+
+Based on the student's history, pick the absolute best 3 events from the available list that create a balanced, engaging mix.
+For each of your 3 choices, write a heavily customized 1-sentence 'aiRecommenderReason' explaining exactly why this specific student will love it (e.g., "Since you recently attended Tech Talk, this AI Workshop perfectly matches your engineering interests").
+Return a JSON array of 3 objects containing the eventId and the aiRecommenderReason.
+      `;
+
+      const recommendationSchema = {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            eventId: { type: Type.NUMBER, description: "The ID of the chosen event from the list" },
+            aiRecommenderReason: { type: Type.STRING, description: "Short, personalized sentence explaining why" }
+          },
+          required: ["eventId", "aiRecommenderReason"]
+        }
+      };
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-lite',
+        contents: promptContext,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: recommendationSchema,
+        }
+      });
+
+      const aiSelections = JSON.parse(response.text || "[]");
+
+      // 9. Merge AI insights back into real event objects
+      const finalRecommendations = aiSelections.map((selection: any) => {
+         const matchingEvent = candidateEvents.find(e => e.id === selection.eventId);
+         if (matchingEvent) {
+            return {
+              ...matchingEvent,
+              aiRecommenderReason: selection.aiRecommenderReason
+            };
+         }
+         return null;
+      }).filter(Boolean);
+
+      // Fallback if AI failed to return 3 objects properly
+      if (finalRecommendations.length > 0) {
+         return NextResponse.json(finalRecommendations);
+      }
+    } catch (aiError) {
+      console.error("Gemini AI Pipeline failed for recommendations, falling back to pure math", aiError);
+    }
+    
+    // Fallback if AI fails or errors
+    return NextResponse.json(candidateEvents.slice(0, 3));
 
   } catch (error) {
     console.error('Unexpected error recommending events:', error);

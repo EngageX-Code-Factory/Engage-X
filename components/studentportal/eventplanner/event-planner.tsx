@@ -12,6 +12,7 @@ type EventType = 'club' | 'academic' | 'event' | 'featured';
 interface ScheduledEvent {
   id: number;
   time: string;
+  endTime?: string;
   title: string;
   type: EventType;
   recommended?: boolean;
@@ -45,13 +46,13 @@ const iconRegistry: Record<string, any> = {
 
 const initialTips: Tip[] = [
   { iconName: 'CheckCircle', text: 'Consider reviewing your schedule to balance workload.', color: 'text-orange-400' },
-  { iconName: 'Info',        text: 'AI Seminar is recommended based on your interests.',          color: 'text-indigo-400' },
+  { iconName: 'Info', text: 'AI Seminar is recommended based on your interests.', color: 'text-indigo-400' },
 ];
 
 const eventColors: Record<EventType, string> = {
-  club:     'bg-indigo-500/10 border border-indigo-500/20',
+  club: 'bg-indigo-500/10 border border-indigo-500/20',
   academic: 'bg-white/5 border border-white/10',
-  event:    'bg-purple-500/10 border border-purple-500/20',
+  event: 'bg-purple-500/10 border border-purple-500/20',
   featured: 'bg-teal-500/10 border border-teal-500/20',
 };
 
@@ -61,7 +62,7 @@ const DAYS_PER_PAGE = 5;
 function getDynamicInitialWeek(): DayPlan[] {
   const week: DayPlan[] = [];
   const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-  
+
   const mockEvents = [
     [{ id: 100, time: '03:00 PM', title: 'Self-Study', type: 'academic' as EventType }],
     [
@@ -83,7 +84,7 @@ function getDynamicInitialWeek(): DayPlan[] {
     const date = new Date();
     date.setDate(date.getDate() + i);
     const dayLabel = days[date.getDay()];
-    
+
     let featured;
     if (i === 5) {
       featured = { time: '09:00 AM', title: 'Hackathon 2026' };
@@ -142,7 +143,7 @@ function CircleProgress({ value }: { value: number }) {
 // ── Day Column ────────────────────────────────────────────────────────────
 function DayColumn({ day }: { day: DayPlan }) {
   const isFeatured = !!day.featured && (!day.events || day.events.length === 0);
-  
+
   // Sort events chronologically
   const sortedEvents = [...(day.events || [])].sort((a, b) => parseTime(a.time) - parseTime(b.time));
 
@@ -155,20 +156,27 @@ function DayColumn({ day }: { day: DayPlan }) {
     return eventsList.map((ev, i) => {
       const isMorning = parseTime(ev.time) < 12 * 60;
       const isEvening = parseTime(ev.time) >= 17 * 60;
-      
+
       let gapUI = null;
       if (i < eventsList.length - 1) {
         const nextEv = eventsList[i + 1];
-        const gapMins = parseTime(nextEv.time) - (parseTime(ev.time) + 60); // assume event takes 1 hour
-        if (gapMins >= 30) {
+        
+        let currentEndMins = parseTime(ev.time) + 60; // assume 1 hour fallback
+        if (ev.endTime) {
+          currentEndMins = parseTime(ev.endTime);
+        }
+        
+        const gapMins = parseTime(nextEv.time) - currentEndMins;
+        
+        if (gapMins >= 15) { // Adjusted to 15 mins to show more granular free time
           const hours = Math.floor(gapMins / 60);
           const mins = gapMins % 60;
           const timeStr = hours > 0 ? `${hours}h ${mins > 0 ? mins + 'm ' : ''}` : `${mins}m `;
           gapUI = (
             <div className="flex items-center gap-2 my-1.5 opacity-60">
-               <div className="flex-1 border-t border-dashed border-white/20" />
-               <span className="text-[9px] text-teal-400 font-bold tracking-widest whitespace-nowrap">{timeStr}FREE</span>
-               <div className="flex-1 border-t border-dashed border-white/20" />
+              <div className="flex-1 border-t border-dashed border-white/20" />
+              <span className="text-[9px] text-teal-400 font-bold tracking-widest whitespace-nowrap">{timeStr}FREE</span>
+              <div className="flex-1 border-t border-dashed border-white/20" />
             </div>
           );
         }
@@ -178,7 +186,9 @@ function DayColumn({ day }: { day: DayPlan }) {
         <div key={ev.id} className="flex flex-col gap-1.5">
           <div className={`rounded-xl p-2.5 ${eventColors[ev.type] || 'bg-white/5 border border-white/10'}`}>
             <div className="flex justify-between items-start mb-0.5">
-              <p className="text-[10px] text-gray-400 font-medium">{ev.time}</p>
+              <p className="text-[10px] text-gray-400 font-medium tracking-tight">
+                {ev.time} {ev.endTime && <span className="text-gray-500">- {ev.endTime}</span>}
+              </p>
               {isEvening && <span className="text-[10px] opacity-70">🌙</span>}
               {isMorning && <span className="text-[10px] opacity-70" title="Morning">☀️</span>}
               {!isMorning && !isEvening && <span className="text-[10px] opacity-70" title="Afternoon">🌤️</span>}
@@ -199,21 +209,28 @@ function DayColumn({ day }: { day: DayPlan }) {
   // Cross Gap (Gap between the last day event and the first evening event)
   let crossGapUI = null;
   if (dayEvents.length > 0 && eveningEvents.length > 0) {
-     const lastDayEv = dayEvents[dayEvents.length - 1];
-     const firstEveEv = eveningEvents[0];
-     const gapMins = parseTime(firstEveEv.time) - (parseTime(lastDayEv.time) + 60);
-     if (gapMins >= 60) {
-        const hours = Math.floor(gapMins / 60);
-        const mins = gapMins % 60;
-        const timeStr = hours > 0 ? `${hours}h ${mins > 0 ? mins + 'm ' : ''}` : `${mins}m `;
-        crossGapUI = (
-           <div className="flex items-center gap-2 my-2 opacity-50 mt-auto pt-2">
-              <div className="flex-1 border-t border-dashed border-white/20" />
-              <span className="text-[9px] text-teal-300/80 font-bold tracking-widest whitespace-nowrap">{timeStr}FREE TIME</span>
-              <div className="flex-1 border-t border-dashed border-white/20" />
-           </div>
-        );
-     }
+    const lastDayEv = dayEvents[dayEvents.length - 1];
+    const firstEveEv = eveningEvents[0];
+    
+    let currentEndMins = parseTime(lastDayEv.time) + 60;
+    if (lastDayEv.endTime) {
+       currentEndMins = parseTime(lastDayEv.endTime);
+    }
+    
+    const gapMins = parseTime(firstEveEv.time) - currentEndMins;
+    
+    if (gapMins >= 60) {
+      const hours = Math.floor(gapMins / 60);
+      const mins = gapMins % 60;
+      const timeStr = hours > 0 ? `${hours}h ${mins > 0 ? mins + 'm ' : ''}` : `${mins}m `;
+      crossGapUI = (
+        <div className="flex items-center gap-2 my-2 opacity-50 mt-auto pt-2">
+          <div className="flex-1 border-t border-dashed border-white/20" />
+          <span className="text-[9px] text-teal-300/80 font-bold tracking-widest whitespace-nowrap">{timeStr}FREE TIME</span>
+          <div className="flex-1 border-t border-dashed border-white/20" />
+        </div>
+      );
+    }
   }
 
   return (
@@ -236,9 +253,9 @@ function DayColumn({ day }: { day: DayPlan }) {
 
       {/* Morning & Afternoon Events Section */}
       {dayEvents.length > 0 && (
-         <div className="flex flex-col gap-2">
-            {renderEventList(dayEvents)}
-         </div>
+        <div className="flex flex-col gap-2">
+          {renderEventList(dayEvents)}
+        </div>
       )}
 
       {/* Divider between Day and Evening if calculating big gap */}
@@ -246,12 +263,12 @@ function DayColumn({ day }: { day: DayPlan }) {
 
       {/* If evening but no day events, we need auto margin to push it to bottom */}
       <div className={`flex flex-col gap-2 ${dayEvents.length === 0 ? 'mt-auto' : crossGapUI ? 'mt-3' : 'mt-auto pt-4'}`}>
-         {eveningEvents.length > 0 && (
-            <>
-               {dayEvents.length === 0 && <span className="text-[10px] text-gray-500 font-bold tracking-widest uppercase px-1">Evening</span>}
-               {renderEventList(eveningEvents)}
-            </>
-         )}
+        {eveningEvents.length > 0 && (
+          <>
+            {dayEvents.length === 0 && <span className="text-[10px] text-gray-500 font-bold tracking-widest uppercase px-1">Evening</span>}
+            {renderEventList(eveningEvents)}
+          </>
+        )}
       </div>
 
       {day.featured && !isFeatured && (
@@ -270,10 +287,7 @@ function DayColumn({ day }: { day: DayPlan }) {
 
       {day.isFreeAfternoon && sortedEvents.length === 0 && (
         <div className="flex-1 flex flex-col items-center justify-center pt-8">
-          <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-2">
-             <span className="text-lg">🛋️</span>
-          </div>
-          <span className="text-[11px] tracking-widest text-gray-500 uppercase font-bold text-center">Entire<br/>Free Day</span>
+          <span className="text-[11px] tracking-widest text-gray-500 uppercase font-bold text-center">Entire<br />Free Day</span>
         </div>
       )}
 
@@ -319,7 +333,7 @@ export default function EventPlanner() {
     } catch (e) {
       console.error('Failed to parse saved schedule', e);
     }
-    
+
     // If nothing saved in localStorage, load the dynamic mock template
     setFullWeek(getDynamicInitialWeek());
   }, []);
@@ -334,31 +348,42 @@ export default function EventPlanner() {
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const currentMonthStr = monthNames[new Date().getMonth()];
 
-  const headerTitle = fullWeek.length > 0 
+  const headerTitle = fullWeek.length > 0
     ? `Week of ${currentMonthStr} ${fullWeek[weekPage * DAYS_PER_PAGE]?.date}–${fullWeek[Math.min(weekPage * DAYS_PER_PAGE + DAYS_PER_PAGE - 1, fullWeek.length - 1)]?.date}`
     : 'Planning your week...';
 
   const handleGenerateAI = async () => {
     setLoadingAI(true);
-    
+
     // Pass current date context to AI so it knows what week it is modifying
     const today = new Date();
     const endDate = new Date();
     endDate.setDate(today.getDate() + 6);
 
     try {
-      const resp = await fetch('/api/ai/schedule-planner', { 
+      const resp = await fetch('/api/ai/schedule-planner', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           startDate: today.toDateString(),
           endDate: endDate.toDateString()
         })
       });
       const data = await resp.json();
-      
+
       if (data.fullWeek && Array.isArray(data.fullWeek)) {
-        setFullWeek(data.fullWeek);
+        // Enforce true local dates to completely prevent AI timezone hallucinations
+        const trueLocalTemplate = getDynamicInitialWeek();
+        const safeWeek = data.fullWeek.map((aiDay: any, index: number) => {
+          if (trueLocalTemplate[index]) {
+            aiDay.date = trueLocalTemplate[index].date;
+            aiDay.dayLabel = trueLocalTemplate[index].dayLabel;
+            aiDay.isToday = trueLocalTemplate[index].isToday;
+          }
+          return aiDay;
+        });
+
+        setFullWeek(safeWeek);
         setTips(data.tips || []);
         if (data.balanceScore !== undefined) {
           setBalanceScore(data.balanceScore);
@@ -368,7 +393,7 @@ export default function EventPlanner() {
 
         // Permanently save this generated schedule across page reloads
         localStorage.setItem('engagex_saved_schedule', JSON.stringify({
-          fullWeek: data.fullWeek,
+          fullWeek: safeWeek,
           tips: data.tips || [],
           balanceScore: data.balanceScore
         }));
@@ -396,9 +421,9 @@ export default function EventPlanner() {
               Get smart recommendations and avoid schedule conflicts automatically.
             </p>
             <button
-               onClick={handleGenerateAI}
-               disabled={loadingAI}
-               className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:opacity-90 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg shadow-purple-500/20 flex items-center gap-2"
+              onClick={handleGenerateAI}
+              disabled={loadingAI}
+              className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:opacity-90 disabled:opacity-50 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg shadow-purple-500/20 flex items-center gap-2"
             >
               {loadingAI ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Crafting Schedule...</>
@@ -416,11 +441,11 @@ export default function EventPlanner() {
       {/* ── Main Plan Layout ── */}
       <div className="relative bg-white/3 border border-white/10 rounded-3xl p-6 flex flex-col gap-6 min-h-[480px]">
         {loadingAI && (
-           <div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center">
-              <Loader2 className="w-12 h-12 text-purple-400 animate-spin mb-4" />
-              <p className="text-white font-bold text-lg">AI is optimizing your week...</p>
-              <p className="text-gray-400 text-sm mt-1">Balancing classes, clubs, and free time.</p>
-           </div>
+          <div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center">
+            <Loader2 className="w-12 h-12 text-purple-400 animate-spin mb-4" />
+            <p className="text-white font-bold text-lg">AI is optimizing your week...</p>
+            <p className="text-gray-400 text-sm mt-1">Balancing classes, clubs, and free time.</p>
+          </div>
         )}
 
         <div className="flex items-center justify-between">
@@ -453,9 +478,8 @@ export default function EventPlanner() {
               <button
                 key={i}
                 onClick={() => setWeekPage(i)}
-                className={`rounded-full transition-all duration-300 ${
-                  i === weekPage ? 'w-6 h-2 bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.4)]' : 'w-2 h-2 bg-white/20 hover:bg-white/40'
-                }`}
+                className={`rounded-full transition-all duration-300 ${i === weekPage ? 'w-6 h-2 bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.4)]' : 'w-2 h-2 bg-white/20 hover:bg-white/40'
+                  }`}
               />
             ))}
           </div>
