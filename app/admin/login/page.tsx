@@ -1,301 +1,322 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import {
-  Shield, Users, Search, Plus, X, ChevronDown,
-  LogOut, ArrowLeft, Mail, Phone, MapPin, Hash,
-  CheckCircle2, AlertCircle, Loader2,
-  RefreshCw, Eye, Trash2
-} from 'lucide-react';
-import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+  Shield, Eye, EyeOff, Lock, Mail,
+  AlertTriangle, Loader2, ChevronRight, UserCheck, UserPlus
+} from "lucide-react";
+import Link from "next/link"; // Import Link for navigation
 
-// ─── TYPES mapped to your public.profiles schema ────────────────────────────
-type Role = 'student' | 'organization' | 'admin';
-type Status = 'active' | 'inactive' | 'suspended';
-
-interface Member {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
-  avatar_url: string | null;
-  student_id: string | null;
-  mobile: string | null;
-  address: string | null;
-  role: Role;
-  status: Status;
-  created_at: string;
-}
-
-const ROLE_META: Record<Role, { label: string; color: string; bg: string; border: string }> = {
-  admin:        { label: 'Admin',        color: '#f97316', bg: 'rgba(249,115,22,0.1)',  border: 'rgba(249,115,22,0.25)' },
-  organization: { label: 'Organization', color: '#a855f7', bg: 'rgba(168,85,247,0.1)', border: 'rgba(168,85,247,0.25)' },
-  student:      { label: 'Student',      color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.25)' },
-};
-
-const STATUS_META: Record<Status, { color: string; dot: string }> = {
-  active:    { color: '#10b981', dot: '#10b981' },
-  inactive:  { color: '#64748b', dot: '#64748b' },
-  suspended: { color: '#ef4444', dot: '#ef4444' },
-};
-
-// ─── Component ───────────────────────────────────────────────────────────────
-export default function AdminUsersPage() {
-  const [members, setMembers]   = useState<Member[]>([]);
-  const [filtered, setFiltered] = useState<Member[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [search, setSearch]     = useState('');
-  const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
-  
-  // UI States
-  const [showAdd, setShowAdd]   = useState(false);
-  const [addLoading, setAddLoading] = useState(false);
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [roleChanging, setRoleChanging] = useState<string | null>(null);
-  const [viewMember, setViewMember] = useState<Member | null>(null);
-
-  const [addForm, setAddForm] = useState({
-    email: '', password: '', first_name: '', last_name: '',
-    student_id: '', mobile: '', role: 'student' as Role,
-  });
-
+export default function AdminLoginPage() {
+  const [email, setEmail]             = useState("");
+  const [password, setPassword]       = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+  const [isLoading, setIsLoading]     = useState(false);
+  const [mounted, setMounted]         = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
-  // ── Database: Fetch ────────────────────────────────────────────────────────
-  const fetchMembers = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
 
-    if (!error && data) setMembers(data as Member[]);
-    setLoading(false);
-  }, [supabase]);
-
-  useEffect(() => { fetchMembers(); }, [fetchMembers]);
-
-  // ── Database: Change Role (PERSISTENT) ─────────────────────────────────────
-  const changeRole = async (memberId: string, newRole: Role) => {
-    setRoleChanging(memberId);
-    setOpenMenu(null);
-    
-    // 1. Database Update
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', memberId);
-
-    if (error) {
-      alert("Database error: " + error.message);
-    } else {
-      // 2. State Update
-      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m));
-    }
-    setRoleChanging(null);
-  };
-
-  // ── Database: Add Member ───────────────────────────────────────────────────
-  const handleAddMember = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAddLoading(true);
-    
-    // This uses your custom 'handle_new_user' trigger logic
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: addForm.email,
-      password: addForm.password,
-      options: { data: { first_name: addForm.first_name, last_name: addForm.last_name } }
-    });
+    setIsLoading(true);
+    setError(null);
+    const supabase = createClient();
 
-    if (authError) {
-      alert(authError.message);
-    } else if (authData.user) {
-      // Force the role in the profile table (Trigger might set default to student)
-      await supabase.from('profiles').update({ 
-        role: addForm.role,
-        student_id: addForm.student_id,
-        mobile: addForm.mobile 
-      }).eq('id', authData.user.id);
-      
-      setShowAdd(false);
-      fetchMembers();
+    try {
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({ email, password });
+
+      if (authError) {
+        setError("Invalid credentials. Access denied.");
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", authData.user.id)
+        .single();
+
+      if (profileError || !profile) {
+        await supabase.auth.signOut();
+        setError("Profile not found. Contact system administrator.");
+        return;
+      }
+
+      if (profile.role !== "admin") {
+        await supabase.auth.signOut();
+        setError("Access restricted to administrators only.");
+        return;
+      }
+
+      router.push("/admin");
+
+    } catch {
+      setError("A system error occurred. Try again.");
+    } finally {
+      setIsLoading(false);
     }
-    setAddLoading(false);
   };
-
-  // ── Filtering Logic ────────────────────────────────────────────────────────
-  useEffect(() => {
-    let list = [...members];
-    if (roleFilter !== 'all') list = list.filter(m => m.role === roleFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(m =>
-        `${m.first_name} ${m.last_name}`.toLowerCase().includes(q) ||
-        m.email?.toLowerCase().includes(q) ||
-        m.student_id?.toLowerCase().includes(q)
-      );
-    }
-    setFiltered(list);
-  }, [members, search, roleFilter]);
-
-  if (loading && members.length === 0) return (
-    <div className="h-screen bg-[#080c14] flex items-center justify-center">
-      <Loader2 className="animate-spin text-blue-500" size={40} />
-    </div>
-  );
 
   return (
-    <div className="min-h-screen bg-[#080c14] text-[#e2e8f0] font-sans p-8 md:p-12">
+    <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        @keyframes spin       { to { transform: rotate(360deg); } }
+        @keyframes shake      { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+        @keyframes fadein     { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes drift      { from{transform:translate(0,0)} to{transform:translate(40px,30px)} }
+
+        .al-root {
+          min-height: 100vh;
+          background: #080c14;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: 'Sora', sans-serif;
+          color: #e2e8f0;
+          position: relative;
+          overflow: hidden;
+          padding: 20px;
+        }
+
+        .al-blob {
+          position: absolute; border-radius: 50%;
+          filter: blur(110px); pointer-events: none; z-index: 0;
+        }
+        .al-blob-1 {
+          width: 520px; height: 520px;
+          background: radial-gradient(circle, rgba(29,78,216,0.28) 0%, transparent 70%);
+          top: -180px; left: -140px;
+          animation: drift 20s ease-in-out infinite alternate;
+        }
+        .al-blob-2 {
+          width: 360px; height: 360px;
+          background: radial-gradient(circle, rgba(99,102,241,0.14) 0%, transparent 70%);
+          bottom: -80px; right: -80px;
+          animation: drift 26s ease-in-out infinite alternate-reverse;
+        }
+
+        .al-grid {
+          position: absolute; inset: 0; z-index: 1; pointer-events: none;
+          background-image: radial-gradient(circle, rgba(59,130,246,0.12) 1px, transparent 1px);
+          background-size: 36px 36px;
+        }
+
+        .al-card {
+          position: relative; z-index: 10;
+          width: 100%; max-width: 420px;
+          background: #0d1320;
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 20px;
+          padding: 40px 36px;
+          box-shadow: 0 24px 64px rgba(0,0,0,0.55);
+          animation: fadein .3s ease;
+        }
+
+        .al-role-tag {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(59,130,246,0.1);
+          border: 1px solid rgba(59,130,246,0.2);
+          padding: 10px 16px;
+          border-radius: 12px;
+          margin-bottom: 30px;
+        }
+        .al-role-icon { color: #3b82f6; }
+        .al-role-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #475569; text-transform: uppercase; letter-spacing: 1px; }
+        .al-role-value { font-weight: 700; color: #60a5fa; font-size: 13px; }
+
+        .al-logo {
+          display: flex; align-items: center; gap: 12px;
+          margin-bottom: 24px;
+        }
+        .al-logo-icon {
+          width: 44px; height: 44px;
+          background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+          border-radius: 12px;
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 0 24px rgba(59,130,246,0.3);
+        }
+        .al-logo-text { font-size: 17px; font-weight: 800; color: #f1f5f9; letter-spacing: -0.4px; }
+        .al-logo-sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #3b82f6; letter-spacing: 2px; text-transform: uppercase; }
+
+        .al-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent); margin-bottom: 28px; }
+
+        .al-form { display: flex; flex-direction: column; gap: 18px; }
+        .al-field-label { display: block; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; color: #334155; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 7px; }
+
+        .al-input-wrap {
+          display: flex; align-items: center; gap: 11px; height: 48px;
+          background: rgba(8, 12, 20, 0.7);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 11px; padding: 0 14px;
+          transition: border-color .2s;
+        }
+        .al-input-wrap:focus-within { border-color: rgba(59,130,246,0.45); box-shadow: 0 0 18px rgba(59,130,246,0.08); }
+        .al-input-icon { color: #2d3f55; }
+        .al-input-wrap:focus-within .al-input-icon { color: #3b82f6; }
+        .al-input { flex: 1; background: transparent; border: none; outline: none; font-family: 'Sora', sans-serif; font-size: 14px; color: #e2e8f0; }
+        .al-input::placeholder { color: #1e2d42; }
+
+        .al-eye-btn { background: none; border: none; cursor: pointer; color: #2d3f55; display: flex; align-items: center; }
+
+        .al-error {
+          display: flex; align-items: flex-start; gap: 9px; padding: 11px 13px;
+          background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.18);
+          border-radius: 10px; font-size: 13px; color: #f87171; animation: shake .3s ease;
+        }
+
+        .al-submit {
+          width: 100%; height: 48px; border: none; border-radius: 11px;
+          background: linear-gradient(135deg, #1d4ed8, #2563eb 60%, #3b82f6);
+          color: white; font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 700;
+          cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+          box-shadow: 0 4px 18px rgba(37,99,235,0.32); transition: transform .2s, box-shadow .2s;
+          margin-top: 4px;
+        }
+        .al-submit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(37,99,235,0.48); }
+        .al-submit:disabled { opacity: .6; cursor: not-allowed; }
+
+        .al-register-link {
+          margin-top: 24px;
+          text-align: center;
+          font-size: 13px;
+          color: #475569;
+        }
+        .al-register-link a {
+          color: #3b82f6;
+          font-weight: 600;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          transition: color 0.2s;
+        }
+        .al-register-link a:hover {
+          color: #60a5fa;
+          text-decoration: underline;
+        }
+
+        .al-footer { margin-top: 26px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; }
+        .al-footer-mono { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #1e293b; letter-spacing: 1.5px; text-transform: uppercase; }
       `}</style>
 
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
-          <div>
-            <Link href="/admin" className="text-blue-500 hover:text-blue-400 text-sm font-bold flex items-center gap-1 mb-4">
-              <ArrowLeft size={14} /> Back to Overview
-            </Link>
-            <h1 className="text-4xl font-extrabold text-white mb-2 italic uppercase">User Registry</h1>
-            <p className="text-slate-500">Managing <span className="text-blue-400 font-bold">{members.length}</span> platform identities.</p>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-              <input 
-                placeholder="Search registry..."
-                className="pl-12 pr-6 py-4 bg-[#0d1320] border border-white/5 rounded-2xl focus:border-blue-500/50 outline-none w-full md:w-72 transition-all text-sm font-bold"
-                onChange={(e) => setSearch(e.target.value)}
-              />
+      <div className="al-root">
+        <div className="al-blob al-blob-1" />
+        <div className="al-blob al-blob-2" />
+        <div className="al-grid" />
+
+        <div className="al-card">
+          {/* Logo Section */}
+          <div className="al-logo">
+            <div className="al-logo-icon">
+              <Shield size={22} color="white" />
             </div>
-            <button 
-              onClick={() => setShowAdd(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-blue-900/20 active:scale-95 flex items-center gap-2"
-            >
-              <Plus size={20} /> Add Member
-            </button>
+            <div>
+              <div className="al-logo-text">EngageX</div>
+              <div className="al-logo-sub">Portal System</div>
+            </div>
           </div>
-        </div>
 
-        {/* Filters */}
-        <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
-           {['all', 'student', 'organization', 'admin'].map((r) => (
-             <button 
-               key={r}
-               onClick={() => setRoleFilter(r as any)}
-               className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest border transition-all ${
-                 roleFilter === r ? 'bg-blue-600 border-blue-600 text-white' : 'bg-[#0d1320] border-white/5 text-slate-500'
-               }`}
-             >
-               {r}
-             </button>
-           ))}
-        </div>
+          {/* Role Identifier */}
+          <div className="al-role-tag">
+            <UserCheck className="al-role-icon" size={18} />
+            <div>
+              <div className="al-role-label">Authorised Role</div>
+              <div className="al-role-value">Administrator</div>
+            </div>
+          </div>
 
-        {/* Table Container */}
-        <div className="bg-[#0d1320] border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/5 bg-white/[0.01]">
-                <th className="px-8 py-6 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Identity</th>
-                <th className="px-8 py-6 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Student ID</th>
-                <th className="px-8 py-6 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Access Role</th>
-                <th className="px-8 py-6 font-bold text-slate-500 uppercase tracking-widest text-[10px] text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.02]">
-              {filtered.map((m) => {
-                const meta = ROLE_META[m.role] || ROLE_META.student;
-                return (
-                  <tr key={m.id} className="group hover:bg-white/[0.01] transition-all">
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold">
-                          {m.first_name?.[0]}{m.last_name?.[0]}
-                        </div>
-                        <div>
-                          <p className="font-bold text-white">{m.first_name} {m.last_name}</p>
-                          <p className="text-xs text-slate-500 font-mono">{m.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6 font-mono text-xs text-slate-400">{m.student_id || 'N/A'}</td>
-                    <td className="px-8 py-6">
-                      <div className="relative">
-                        {roleChanging === m.id ? (
-                          <Loader2 size={16} className="animate-spin text-blue-500" />
-                        ) : (
-                          <button 
-                            onClick={() => setOpenMenu(openMenu === m.id ? null : m.id)}
-                            style={{ color: meta.color, background: meta.bg, borderColor: meta.border }}
-                            className="px-4 py-2 rounded-xl text-[10px] font-bold border flex items-center gap-2 uppercase tracking-widest"
-                          >
-                            {m.role} <ChevronDown size={12} />
-                          </button>
-                        )}
-                        {openMenu === m.id && (
-                          <div className="absolute top-full mt-2 left-0 w-48 bg-[#1a1f2e] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
-                            {['student', 'organization', 'admin'].map((role) => (
-                              <button
-                                key={role}
-                                onClick={() => changeRole(m.id, role as Role)}
-                                className="w-full text-left px-4 py-3 text-xs font-bold hover:bg-white/5 text-slate-300 transition-colors uppercase"
-                              >
-                                Set as {role}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                       <button onClick={() => setViewMember(m)} className="p-3 bg-white/5 text-slate-400 rounded-xl hover:text-white transition-all">
-                          <Eye size={18} />
-                       </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="al-divider" />
+
+          <form className="al-form" onSubmit={handleLogin}>
+            {error && (
+              <div className="al-error">
+                <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="al-field-label">System Email</label>
+              <div className="al-input-wrap">
+                <Mail size={15} className="al-input-icon" />
+                <input
+                  type="email"
+                  className="al-input"
+                  placeholder="admin@engagex.lk"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="al-field-label">Access Token</label>
+              <div className="al-input-wrap">
+                <Lock size={15} className="al-input-icon" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="al-input"
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  className="al-eye-btn"
+                  onClick={() => setShowPassword(s => !s)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" className="al-submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  Verifying Identity…
+                </>
+              ) : (
+                <>
+                  <Shield size={16} />
+                  Identify & Authorise
+                  <ChevronRight size={14} style={{ marginLeft: 2, opacity: .7 }} />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* New Create Account Section */}
+          <div className="al-register-link">
+            No administrative credentials? <br />
+            <Link href="/admin/register">
+              <UserPlus size={14} /> Request System Access
+            </Link>
+          </div>
+
+          <div className="al-footer">
+            <div className="al-footer-mono">
+              Secure Terminal <span>v2.0</span> // BALANGODA_SRI_LANKA
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* MODAL: ADD MEMBER */}
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
-          <div className="bg-[#0d1320] w-full max-w-lg rounded-[2.5rem] p-12 shadow-2xl border border-white/10 relative">
-            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-2xl font-bold text-white italic uppercase">Initialize Account</h3>
-              <button onClick={() => setShowAdd(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-400"><X size={24} /></button>
-            </div>
-            <form onSubmit={handleAddMember} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <input className="p-4 bg-black/40 border border-white/5 rounded-2xl outline-none focus:border-blue-500/50 text-white text-sm" placeholder="First Name" required onChange={e => setAddForm({...addForm, first_name: e.target.value})} />
-                <input className="p-4 bg-black/40 border border-white/5 rounded-2xl outline-none focus:border-blue-500/50 text-white text-sm" placeholder="Last Name" required onChange={e => setAddForm({...addForm, last_name: e.target.value})} />
-              </div>
-              <input className="w-full p-4 bg-black/40 border border-white/5 rounded-2xl outline-none focus:border-blue-500/50 text-white text-sm" placeholder="Email Address" type="email" required onChange={e => setAddForm({...addForm, email: e.target.value})} />
-              <input className="w-full p-4 bg-black/40 border border-white/5 rounded-2xl outline-none focus:border-blue-500/50 text-white text-sm" placeholder="Password (Min 8 characters)" type="password" required minLength={8} onChange={e => setAddForm({...addForm, password: e.target.value})} />
-              <div className="grid grid-cols-2 gap-4">
-                <input className="p-4 bg-black/40 border border-white/5 rounded-2xl outline-none focus:border-blue-500/50 text-white text-sm" placeholder="Student ID" onChange={e => setAddForm({...addForm, student_id: e.target.value})} />
-                <select className="p-4 bg-black/40 border border-white/5 rounded-2xl outline-none focus:border-blue-500/50 text-white text-sm appearance-none" onChange={e => setAddForm({...addForm, role: e.target.value as Role})}>
-                  <option value="student">Student</option>
-                  <option value="organization">Organization</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-5 rounded-2xl mt-4 uppercase tracking-widest text-xs">
-                {addLoading ? <Loader2 className="animate-spin mx-auto" /> : "Deploy Identity"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }

@@ -7,15 +7,14 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-
-// --- INTERFACES mapped to your DB Schema ---
+// --- INTERFACES mapped strictly to your SQL schema ---
 interface Club {
   clubid: string;
   club_name: string;
   category: string;
   club_description: string;
-  active_members: number;
-  createdate: string;
+  active_members: number; 
+  createdate: string;     
   leader_name?: string; 
 }
 
@@ -25,7 +24,6 @@ export default function ManageClubs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Form State matching public.clubs table requirements
   const [newClub, setNewClub] = useState({ 
     club_name: '', 
     club_description: '', 
@@ -34,37 +32,34 @@ export default function ManageClubs() {
   
   const supabase = createClient();
 
-  const fetchClubs = useCallback(async () => {
-    // 1. Fetch clubs with a join on my_clubs to get leader details
+  // 1. Define the callback first
+const fetchClubs = useCallback(async () => {
+  setLoading(true);
+  try {
     const { data, error } = await supabase
       .from('clubs')
-      .select(`
-        *,
-        my_clubs (
-          full_name,
-          status
-        )
-      `)
+      .select('*, my_clubs(full_name, status)')
       .order('createdate', { ascending: false });
 
-    if (error) {
-      console.error("Fetch Error:", error.message);
-      return;
-    }
-
+    if (error) throw error;
     if (data) {
-      const processed = data.map((club: any) => {
-        // 2. Filter joined data for the member marked as 'LEADER'
-        const leaderObj = club.my_clubs?.find((m: any) => m.status === 'LEADER');
-        return {
-          ...club,
-          leader_name: leaderObj?.full_name || 'No Leader Assigned'
-        };
-      });
+      const processed = data.map((club: any) => ({
+        ...club,
+        leader_name: club.my_clubs?.find((m: any) => m.status === 'LEADER')?.full_name || 'No Leader Assigned'
+      }));
       setClubs(processed);
     }
+  } catch (err: any) {
+    console.error("Fetch Error:", err.message);
+  } finally {
     setLoading(false);
-  }, [supabase]);
+  }
+}, [supabase]); // fetchClubs depends on supabase
+
+// 2. Then define the effect
+useEffect(() => {
+  fetchClubs();
+}, [fetchClubs]); // useEffect depends ONLY on fetchClubs
 
   useEffect(() => {
     fetchClubs();
@@ -72,7 +67,6 @@ export default function ManageClubs() {
 
   const handleCreateClub = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 3. Insert using the correct column names from your schema
     const { error } = await supabase.from('clubs').insert([newClub]);
     
     if (error) {
@@ -86,7 +80,8 @@ export default function ManageClubs() {
 
   const deleteClub = async (id: string) => {
     if (!confirm("This will permanently remove the organization and all member records. Proceed?")) return;
-    // 4. Use 'clubid' as defined in your primary key constraint
+    
+    // Uses 'clubid' column as defined in your primary key constraint
     const { error } = await supabase.from('clubs').delete().eq('clubid', id);
     if (!error) fetchClubs();
     else alert(error.message);
@@ -96,7 +91,7 @@ export default function ManageClubs() {
     club.club_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) return (
+  if (loading && clubs.length === 0) return (
     <div className="h-screen bg-[#080c14] flex items-center justify-center">
       <Loader2 className="animate-spin text-blue-500" size={40} />
     </div>
@@ -109,17 +104,17 @@ export default function ManageClubs() {
         {/* Navigation Breadcrumb */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
           <div>
-            <Link href="/admin" className="text-blue-500 hover:text-blue-400 text-sm font-bold flex items-center gap-1 transition-colors mb-4 group">
-              <ChevronRight size={14} className="rotate-180 group-hover:-translate-x-1 transition-transform" /> 
-              Back to System Overview
+            <Link href="/admin" className="text-blue-500 hover:text-blue-400 text-sm font-bold flex items-center gap-1 mb-4 group transition-colors">
+              <ChevronRight size={16} className="rotate-180 group-hover:-translate-x-1 transition-transform" /> 
+              Back to Portal
             </Link>
             <h1 className="text-4xl font-extrabold tracking-tight text-white mb-2 italic uppercase">Organization Registry</h1>
             <p className="text-slate-500 font-medium">Monitoring <span className="text-blue-400 font-bold">{clubs.length}</span> verified entities.</p>
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={18} />
               <input 
                 type="text" placeholder="Search system database..."
                 className="pl-12 pr-6 py-4 bg-[#0d1320] border border-white/5 rounded-2xl focus:border-blue-500/50 outline-none w-full md:w-72 transition-all text-sm font-bold placeholder:text-slate-600"
@@ -128,7 +123,7 @@ export default function ManageClubs() {
             </div>
             <button 
               onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-lg active:scale-95"
+              className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-lg active:scale-95 flex items-center gap-2"
             >
               <Plus size={20} /> Register Club
             </button>
@@ -136,7 +131,7 @@ export default function ManageClubs() {
         </div>
 
         {/* Custom Data Grid */}
-        <div className="bg-[#0d1320] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
+        <div className="bg-[#0d1320] border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-white/5 bg-white/[0.01]">
@@ -178,7 +173,7 @@ export default function ManageClubs() {
               ))}
             </tbody>
           </table>
-          {filteredClubs.length === 0 && (
+          {filteredClubs.length === 0 && !loading && (
             <div className="p-24 text-center text-slate-600 font-bold italic border-t border-white/5">
               No matching records found in university registry.
             </div>
@@ -191,11 +186,8 @@ export default function ManageClubs() {
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
           <div className="bg-[#0d1320] w-full max-w-lg rounded-[2.5rem] p-12 shadow-2xl border border-white/10 relative">
             <div className="flex justify-between items-center mb-10">
-              <div>
-                <h3 className="text-2xl font-bold text-white italic uppercase tracking-tighter">Initialize Entity</h3>
-                <p className="text-slate-500 text-xs font-mono uppercase tracking-widest mt-1">// New Registry Entry</p>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors text-slate-400"><X size={24} /></button>
+              <h3 className="text-2xl font-bold text-white italic uppercase tracking-tighter">Initialize Entity</h3>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-400"><X size={24} /></button>
             </div>
 
             <form onSubmit={handleCreateClub} className="space-y-6">
