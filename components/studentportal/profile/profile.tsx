@@ -159,6 +159,16 @@ export default function Profile() {
         if (result.avatarUrl) {
           setProfileImage(result.avatarUrl);
         }
+        
+        // Dispatch custom event for real-time update in navbar
+        window.dispatchEvent(new CustomEvent('profile-updated', {
+          detail: {
+            firstName: profileData.firstName,
+            lastName: profileData.lastName,
+            avatarUrl: result.avatarUrl || profileImage
+          }
+        }));
+
         toast.success('Profile updated successfully');
       } else {
         const errorText = await response.text();

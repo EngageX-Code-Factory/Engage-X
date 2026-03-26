@@ -44,10 +44,7 @@ const iconRegistry: Record<string, any> = {
   Calendar,
 };
 
-const initialTips: Tip[] = [
-  { iconName: 'CheckCircle', text: 'Consider reviewing your schedule to balance workload.', color: 'text-orange-400' },
-  { iconName: 'Info', text: 'AI Seminar is recommended based on your interests.', color: 'text-indigo-400' },
-];
+const initialTips: Tip[] = [];
 
 const eventColors: Record<EventType, string> = {
   club: 'bg-indigo-500/10 border border-indigo-500/20',
@@ -63,41 +60,18 @@ function getDynamicInitialWeek(): DayPlan[] {
   const week: DayPlan[] = [];
   const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
-  const mockEvents = [
-    [{ id: 100, time: '03:00 PM', title: 'Self-Study', type: 'academic' as EventType }],
-    [
-      { id: 1, time: '10:00 AM', title: 'Robotics Club', type: 'club' as EventType },
-      { id: 2, time: '01:00 PM', title: 'Lecture: CS101', type: 'academic' as EventType },
-    ],
-    [
-      { id: 3, time: '09:00 AM', title: 'Career Fair', type: 'event' as EventType },
-      { id: 4, time: '11:00 AM', title: 'Tech Talk', type: 'event' as EventType, gap: true },
-      { id: 5, time: '02:00 PM', title: 'Lab: Physics', type: 'academic' as EventType },
-    ],
-    [{ id: 6, time: '04:00 PM', title: 'AI Seminar', type: 'event' as EventType, recommended: true }],
-    [],
-    [],
-    [{ id: 101, time: '06:00 PM', title: 'Music Fest', type: 'event' as EventType }],
-  ];
-
   for (let i = 0; i < 7; i++) {
     const date = new Date();
     date.setDate(date.getDate() + i);
     const dayLabel = days[date.getDay()];
 
-    let featured;
-    if (i === 5) {
-      featured = { time: '09:00 AM', title: 'Hackathon 2026' };
-    }
-
     week.push({
       dayLabel,
       date: date.getDate(),
       isToday: i === 0,
-      isBusy: i === 2,
-      isFreeAfternoon: i === 3 || i === 4,
-      events: mockEvents[i] || [],
-      featured
+      isBusy: false,
+      isFreeAfternoon: false,
+      events: [],
     });
   }
   return week;
@@ -308,18 +282,35 @@ function DayColumn({ day }: { day: DayPlan }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────
+import { createClient } from '@/lib/supabase/client';
+
 export default function EventPlanner() {
   const [weekPage, setWeekPage] = useState(0);
   const [fullWeek, setFullWeek] = useState<DayPlan[]>([]);
   const [tips, setTips] = useState<Tip[]>(initialTips);
-  const [balanceScore, setBalanceScore] = useState<number>(85);
+  const [balanceScore, setBalanceScore] = useState<number>(0);
   const [loadingAI, setLoadingAI] = useState(false);
   const [isGenerated, setIsGenerated] = useState(false); // Track if AI successfully ran
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // Run once on client mount to dynamically set dates or load from localStorage
+  // Fetch current user ID on mount
   useEffect(() => {
+    const fetchUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  // Run when userId is available to load from localStorage or set dynamic weeks
+  useEffect(() => {
+    if (!userId) return; // Wait for user ID to ensure isolation
+
     try {
-      const savedData = localStorage.getItem('engagex_saved_schedule');
+      const savedData = localStorage.getItem(`engagex_saved_schedule_${userId}`);
       if (savedData) {
         const parsed = JSON.parse(savedData);
         if (parsed && parsed.fullWeek) {
@@ -334,9 +325,9 @@ export default function EventPlanner() {
       console.error('Failed to parse saved schedule', e);
     }
 
-    // If nothing saved in localStorage, load the dynamic mock template
+    // If nothing saved in localStorage for this user, load the dynamic mock template
     setFullWeek(getDynamicInitialWeek());
-  }, []);
+  }, [userId]);
 
   const TOTAL_PAGES = Math.ceil(fullWeek.length / DAYS_PER_PAGE) || 1;
 
@@ -353,6 +344,7 @@ export default function EventPlanner() {
     : 'Planning your week...';
 
   const handleGenerateAI = async () => {
+    if (!userId) return; // Defensive check
     setLoadingAI(true);
 
     // Pass current date context to AI so it knows what week it is modifying
@@ -391,8 +383,8 @@ export default function EventPlanner() {
         setWeekPage(0); // Reset to first page
         setIsGenerated(true);
 
-        // Permanently save this generated schedule across page reloads
-        localStorage.setItem('engagex_saved_schedule', JSON.stringify({
+        // Permanently save this generated schedule across page reloads for THIS user
+        localStorage.setItem(`engagex_saved_schedule_${userId}`, JSON.stringify({
           fullWeek: safeWeek,
           tips: data.tips || [],
           balanceScore: data.balanceScore
