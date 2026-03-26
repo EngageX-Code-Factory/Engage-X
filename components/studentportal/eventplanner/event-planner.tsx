@@ -134,14 +134,14 @@ function DayColumn({ day }: { day: DayPlan }) {
       let gapUI = null;
       if (i < eventsList.length - 1) {
         const nextEv = eventsList[i + 1];
-        
+
         let currentEndMins = parseTime(ev.time) + 60; // assume 1 hour fallback
         if (ev.endTime) {
           currentEndMins = parseTime(ev.endTime);
         }
-        
+
         const gapMins = parseTime(nextEv.time) - currentEndMins;
-        
+
         if (gapMins >= 15) { // Adjusted to 15 mins to show more granular free time
           const hours = Math.floor(gapMins / 60);
           const mins = gapMins % 60;
@@ -185,14 +185,14 @@ function DayColumn({ day }: { day: DayPlan }) {
   if (dayEvents.length > 0 && eveningEvents.length > 0) {
     const lastDayEv = dayEvents[dayEvents.length - 1];
     const firstEveEv = eveningEvents[0];
-    
+
     let currentEndMins = parseTime(lastDayEv.time) + 60;
     if (lastDayEv.endTime) {
-       currentEndMins = parseTime(lastDayEv.endTime);
+      currentEndMins = parseTime(lastDayEv.endTime);
     }
-    
+
     const gapMins = parseTime(firstEveEv.time) - currentEndMins;
-    
+
     if (gapMins >= 60) {
       const hours = Math.floor(gapMins / 60);
       const mins = gapMins % 60;
@@ -244,6 +244,47 @@ function DayColumn({ day }: { day: DayPlan }) {
           </>
         )}
       </div>
+
+      {/* End of Day Gap (After the last event of the day) */}
+      {(() => {
+        const lastEvent = eveningEvents.length > 0
+          ? eveningEvents[eveningEvents.length - 1]
+          : dayEvents.length > 0
+            ? dayEvents[dayEvents.length - 1]
+            : null;
+
+        if (lastEvent) {
+          const dayEndMins = 22 * 60; // 10:00 PM
+          let lastEndMins = parseTime(lastEvent.time) + 60;
+          if (lastEvent.endTime) {
+            lastEndMins = parseTime(lastEvent.endTime);
+          }
+
+          const gapMins = dayEndMins - lastEndMins;
+          if (gapMins >= 30) {
+            const hours = Math.floor(gapMins / 60);
+            const mins = gapMins % 60;
+            const timeStr = hours > 0 ? `${hours}h ${mins > 0 ? mins + 'm ' : ''}` : `${mins}m `;
+            return (
+              <div className="relative flex-1 mt-4 mb-2 min-h-[100px] flex flex-col items-center">
+                {/* Upper Vertical Line */}
+                <div className="w-px flex-1 border-l border-dashed border-teal-500/30" />
+                
+                {/* Free Time with Cut Lines */}
+                <div className="flex flex-col items-center py-2">
+                  <div className="py-2.5 px-4 flex flex-col items-center">
+                    <span className="text-[10px] text-teal-400 font-bold tracking-widest leading-none">{timeStr} FREE</span>
+                  </div>
+                </div>
+
+                {/* Lower Vertical Line */}
+                <div className="w-px flex-1 border-l border-dashed border-teal-500/30" />
+              </div>
+            );
+          }
+        }
+        return null;
+      })()}
 
       {day.featured && !isFeatured && (
         <div className="flex-1 rounded-xl bg-gradient-to-b from-cyan-500/30 to-teal-500/10 border border-cyan-500/30 p-3 flex flex-col justify-between mt-auto">
