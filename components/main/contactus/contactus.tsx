@@ -1,9 +1,63 @@
 "use client";
 
-import React from "react";
-import { ChevronDown, Mail, MapPin, ArrowRight, Users, Dribbble, AtSign, Phone } from "lucide-react";
+import React, { useState } from "react";
+import { ChevronDown, Mail, MapPin, ArrowRight, Users, Dribbble, AtSign, Phone, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function ContactUs() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    subject: "Club Registration Query",
+    message: ""
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name || !formData.email || !formData.subject || !formData.message) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/main/home/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send message");
+      }
+
+      toast.success("Your message has been sent successfully!");
+      setFormData({
+        name: "",
+        email: "",
+        subject: "Club Registration Query",
+        message: ""
+      });
+    } catch (error: any) {
+      console.error("Submission error:", error);
+      toast.error(error.message || "An unexpected error occurred");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen text-white pb-20 pt-10 px-4 md:px-8 lg:px-16">
       {/* Header section */}
@@ -19,14 +73,18 @@ export default function ContactUs() {
       <div className="max-w-6xl mx-auto grid lg:grid-cols-5 gap-8">
         {/* Left Side: Contact Form */}
         <div className="lg:col-span-3 bg-[#131122] rounded-3xl p-8 md:p-10 border border-[#2d2a4a]/50 shadow-2xl">
-          <form className="flex flex-col gap-6">
+          <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
             {/* Name and Email Row */}
             <div className="grid md:grid-cols-2 gap-6">
               <div className="flex flex-col gap-2">
                 <label className="text-sm text-gray-300 font-medium ml-1">Full Name</label>
                 <input 
                   type="text" 
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
                   placeholder="Alex Student" 
+                  required
                   className="w-full bg-[#1e1b38] border border-[#2d2a4a] rounded-2xl py-3.5 px-5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-[#a855f7] transition-colors"
                 />
               </div>
@@ -34,7 +92,11 @@ export default function ContactUs() {
                 <label className="text-sm text-gray-300 font-medium ml-1">Student Email</label>
                 <input 
                   type="email" 
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
                   placeholder="alex@university.edu" 
+                  required
                   className="w-full bg-[#1e1b38] border border-[#2d2a4a] rounded-2xl py-3.5 px-5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-[#a855f7] transition-colors"
                 />
               </div>
@@ -44,11 +106,16 @@ export default function ContactUs() {
             <div className="flex flex-col gap-2">
               <label className="text-sm text-gray-300 font-medium ml-1">Subject</label>
               <div className="relative">
-                <select className="w-full bg-[#1e1b38] border border-[#2d2a4a] rounded-2xl py-3.5 px-5 text-white text-sm appearance-none focus:outline-none focus:border-[#a855f7] transition-colors">
-                  <option>Club Registration Query</option>
-                  <option>Event Question</option>
-                  <option>Technical Support</option>
-                  <option>Other</option>
+                <select 
+                  name="subject"
+                  value={formData.subject}
+                  onChange={handleChange}
+                  className="w-full bg-[#1e1b38] border border-[#2d2a4a] rounded-2xl py-3.5 px-5 text-white text-sm appearance-none focus:outline-none focus:border-[#a855f7] transition-colors"
+                >
+                  <option value="Club Registration Query">Club Registration Query</option>
+                  <option value="Event Question">Event Question</option>
+                  <option value="Technical Support">Technical Support</option>
+                  <option value="Other">Other</option>
                 </select>
                 <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4 pointer-events-none" />
               </div>
@@ -58,8 +125,12 @@ export default function ContactUs() {
             <div className="flex flex-col gap-2">
               <label className="text-sm text-gray-300 font-medium ml-1">Message</label>
               <textarea 
+                name="message"
+                value={formData.message}
+                onChange={handleChange}
                 placeholder="Tell us how we can help..." 
                 rows={5}
+                required
                 className="w-full bg-[#1e1b38] border border-[#2d2a4a] rounded-2xl py-4 px-5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-[#a855f7] transition-colors resize-none"
               ></textarea>
             </div>
@@ -67,10 +138,15 @@ export default function ContactUs() {
             {/* Submit Button */}
             <div className="mt-4">
               <button 
-                type="button"
-                className="inline-flex items-center justify-center gap-2 bg-[#9333ea] hover:bg-[#a855f7] text-white py-3.5 px-8 rounded-full text-sm font-bold transition-all duration-300 shadow-[0_0_20px_rgba(147,51,234,0.4)] hover:shadow-[0_0_25px_rgba(168,85,247,0.6)]"
+                type="submit"
+                disabled={isSubmitting}
+                className="inline-flex items-center justify-center gap-2 bg-[#9333ea] hover:bg-[#a855f7] text-white py-3.5 px-8 rounded-full text-sm font-bold transition-all duration-300 shadow-[0_0_20px_rgba(147,51,234,0.4)] hover:shadow-[0_0_25px_rgba(168,85,247,0.6)] disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Send Message <ArrowRight className="w-4 h-4" />
+                {isSubmitting ? (
+                  <>Sending... <Loader2 className="w-4 h-4 animate-spin" /></>
+                ) : (
+                  <>Send Message <ArrowRight className="w-4 h-4" /></>
+                )}
               </button>
             </div>
           </form>
