@@ -9,7 +9,7 @@ type EventStatus = "active" | "cancelled";
 interface Event {
   id: string; title: string; date: string; time: string;
   venue: string; category: string; capacity: number;
-  is_published: boolean; status: EventStatus;
+  is_published: boolean; status: EventStatus; image: string;
 }
 
 function getDisplayStatus(event: Event) {
@@ -49,7 +49,8 @@ export default function EventsList() {
           category: d.category || "Uncategorized", // Now fetching real category!
           capacity: 0, // Placeholder: Capacity isn't in your DB yet
           is_published: d.status === 'OPEN',
-          status: d.status === 'CLOSED' ? 'cancelled' : 'active'
+          status: d.status === 'CLOSED' ? 'cancelled' : 'active',
+          image: d.image || ""
         })));
       }
       setIsLoading(false);
@@ -118,7 +119,7 @@ export default function EventsList() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5">
-              {["Event", "Date & Time", "Venue", "Status", "Actions"].map(h => (
+              {["Image", "Event", "Date & Time", "Venue", "Status", "Actions"].map(h => (
                 <th key={h} className={`px-6 py-3.5 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide ${h === "Actions" ? "text-right" : "text-left"}`}>{h}</th>
               ))}
             </tr>
@@ -136,6 +137,17 @@ export default function EventsList() {
               const displayStatus = getDisplayStatus(event);
               return (
                 <tr key={event.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-white/10 overflow-hidden border border-gray-200 dark:border-white/10">
+                      {event.image ? (
+                        <img src={event.image} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          <Calendar size={16} />
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-6 py-4">
                     <p className="font-medium text-gray-900 dark:text-white">{event.title}</p>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{event.category}</p>

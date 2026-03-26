@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Save, Users, Calendar, Clock, MapPin, Tag, FileText, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Users, Calendar, Clock, MapPin, Tag, FileText, Pencil, Loader2, ImagePlus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const CATEGORIES = ["Academic", "Arts & Culture", "Sports", "Technology", "Business", "Community Service", "Religious", "Other"];
@@ -15,10 +15,11 @@ export default function EditEvent({ id }: { id: string }) {
   const [tab, setTab] = useState<"details" | "registrations">("details");
   const [form, setForm] = useState<any>({});
   const [registrations, setRegistrations] = useState<any[]>([]);
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -29,13 +30,14 @@ export default function EditEvent({ id }: { id: string }) {
         setForm({
           title: ev.title, date: ev.event_date, time: ev.event_time,
           venue: ev.location, is_published: ev.status === 'OPEN',
-          category: "", capacity: "", description: "", registration_deadline: ""
+          category: ev.category || "", capacity: "",
+          registration_deadline: "", image: ev.image || ""
         });
       }
       // Fetch Registrations
       const { data: regs } = await supabase.from('my_events').select('id, full_name, email, created_at').eq('event_id', id);
       if (regs) setRegistrations(regs);
-      
+
       setIsLoading(false);
     }
     fetchData();
@@ -47,15 +49,40 @@ export default function EditEvent({ id }: { id: string }) {
     setForm((prev: any) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
   }
 
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/upload/cloudinary", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.url) {
+        setForm((prev: any) => ({ ...prev, image: data.url }));
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      alert("Image upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    
+
     await supabase.from('events').update({
       title: form.title,
       event_date: form.date,
       event_time: form.time,
       location: form.venue,
+      category: form.category,
+      description: form.description,
+      image: form.image,
       status: form.is_published ? 'OPEN' : 'SOON'
     }).eq('id', id);
 
@@ -116,10 +143,6 @@ export default function EditEvent({ id }: { id: string }) {
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div className="space-y-1.5">
-              <label className={labelClass}><FileText size={14} className="text-gray-400" /> Description</label>
-              <textarea name="description" value={form.description} onChange={handleChange} rows={3} className={`${inputClass} resize-none`} />
-            </div>
           </div>
 
           <div className={sectionClass}>
@@ -137,6 +160,38 @@ export default function EditEvent({ id }: { id: string }) {
             <div className="space-y-1.5">
               <label className={labelClass}><MapPin size={14} className="text-gray-400" /> Venue</label>
               <input name="venue" value={form.venue} onChange={handleChange} className={inputClass} />
+            </div>
+
+            <div className="space-y-1.5 pt-4">
+              <label className={labelClass}><ImagePlus size={14} className="text-gray-400" /> Event Visual</label>
+              <div className="relative mt-2">
+                {form.image ? (
+                  <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                    <img src={form.image} alt="Event Preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setForm((prev: any) => ({ ...prev, image: "" }))}
+                      className="absolute top-3 right-3 p-2 bg-black/60 hover:bg-red-500/80 rounded-xl text-white transition-all backdrop-blur-md"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center aspect-video w-full bg-gray-50 dark:bg-white/5 border-2 border-dashed border-gray-200 dark:border-white/10 hover:border-[#8b5cf6]/50 rounded-2xl cursor-pointer transition-all group">
+                    {isUploading ? (
+                      <Loader2 className="animate-spin text-[#8b5cf6]" size={24} />
+                    ) : (
+                      <>
+                        <div className="p-3 rounded-xl bg-white dark:bg-white/10 text-gray-400 group-hover:text-[#8b5cf6] transition-all">
+                          <ImagePlus size={24} />
+                        </div>
+                        <p className="mt-3 text-xs font-semibold text-gray-500 dark:text-gray-400">Upload New Poster</p>
+                      </>
+                    )}
+                    <input type="file" accept="image/*" onChange={handleImageUpload} hidden disabled={isUploading} />
+                  </label>
+                )}
+              </div>
             </div>
           </div>
 
