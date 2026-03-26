@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import { Bell, Send, Clock, Users, Calendar, AlertTriangle, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-type NotifType = "info" | "urgent";
+type NotifType = "academic" | "emergency" | "club";
 type NotifTarget = "members" | "registered" | "all";
 interface Notification {
   id: string; 
+  title: string;
   message: string; 
   type: NotifType;
   target: NotifTarget; 
@@ -22,8 +23,9 @@ const TARGET_LABELS: Record<NotifTarget, string> = {
 };
 
 const TYPE_STYLES: Record<NotifType, string> = {
-  info: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
-  urgent: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400",
+  academic: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
+  emergency: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400",
+  club: "bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400",
 };
 
 const selectClass = "w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0f0c1d] text-sm text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#8b5cf6] transition";
@@ -36,7 +38,7 @@ export default function Notifications() {
   const [isLoading, setIsLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [form, setForm] = useState({ message: "", type: "info" as NotifType, target: "members" as NotifTarget, event_id: "" });
+  const [form, setForm] = useState({ title: "", message: "", type: "academic" as NotifType, target: "members" as NotifTarget, event_id: "" });
 
   const supabase = createClient();
 
@@ -68,11 +70,12 @@ export default function Notifications() {
       
       if (evs) setEvents(evs);
 
-      // 3. Fetch past notifications
+      // 3. Fetch past notifications (only source records for history)
       const { data: notifs } = await supabase
         .from('notifications')
         .select('*')
         .eq('club_id', leader.club_id)
+        .is('user_id', null)
         .order('sent_at', { ascending: false });
         
       if (notifs) setSent(notifs);
@@ -88,38 +91,50 @@ export default function Notifications() {
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.message.trim() || !clubId) return;
+    if (!form.title.trim() || !form.message.trim() || !clubId) return;
     
     setLoading(true);
     
     const event = events.find(ev => ev.id === form.event_id);
     
-    // Prepare the payload based on the updated schema
-    const newNotif = {
+    const payload = {
       club_id: clubId,
+      title: form.title,
       message: form.message,
       type: form.type,
       target: form.target,
       event_id: form.event_id || null,
-      event_title: event?.title || null,
-      sent_at: new Date().toISOString()
+      event_title: event?.title || null
     };
 
-    // Insert into Supabase and catch any errors
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert(newNotif)
-      .select()
-      .single();
+    try {
+      const response = await fetch('/api/organization/notifications/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-    if (error) {
-      console.error("Supabase Error:", error);
-      alert(`Database Error: ${error.message}\n\nDid you run the SQL script to update the notifications table?`);
-    } else if (data) {
-      setSent(prev => [data, ...prev]);
-      setForm({ message: "", type: "info", target: "members", event_id: "" });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send notification');
+      }
+
+      // Refresh history (only source records)
+      const { data: notifs } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('club_id', clubId)
+        .is('user_id', null)
+        .order('sent_at', { ascending: false });
+        
+      if (notifs) setSent(notifs);
+
+      setForm({ title: "", message: "", type: "academic", target: "members", event_id: "" });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
+    } catch (error: any) {
+      console.error("Error sending notification:", error);
+      alert(`Error: ${error.message}`);
     }
     
     setLoading(false);
@@ -152,10 +167,9 @@ export default function Notifications() {
               <AlertTriangle size={14} className="text-gray-400" /> Type
             </label>
             <select name="type" value={form.type} onChange={handleChange} className={selectClass}>
-              <option value="info">Academic</option>
-              <option value="urgent">Emergency</option>
-              <option value="urgent">Club</option>
-
+              <option value="academic">Academic</option>
+              <option value="emergency">Emergency</option>
+              <option value="club">Club</option>
             </select>
           </div>
           <div className="space-y-1.5">
@@ -168,6 +182,21 @@ export default function Notifications() {
               <option value="all">Everyone</option>
             </select>
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+            <Bell size={14} className="text-gray-400" /> Notification Title
+          </label>
+          <input 
+            type="text" 
+            name="title" 
+            value={form.title} 
+            onChange={handleChange} 
+            placeholder="e.g., Upcoming Meeting Update" 
+            className={selectClass} 
+            required 
+          />
         </div>
 
         <div className="space-y-1.5">
@@ -235,10 +264,11 @@ export default function Notifications() {
               <div key={n.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3 flex-1">
-                    <div className={`mt-0.5 p-1.5 rounded-lg shrink-0 ${n.type === "urgent" ? "bg-red-50 dark:bg-red-500/10" : "bg-blue-50 dark:bg-blue-500/10"}`}>
-                      {n.type === "urgent" ? <AlertTriangle size={14} className="text-red-600 dark:text-red-400" /> : <Bell size={14} className="text-blue-600 dark:text-blue-400" />}
+                    <div className={`mt-0.5 p-1.5 rounded-lg shrink-0 ${n.type === "emergency" ? "bg-red-50 dark:bg-red-500/10" : "bg-blue-50 dark:bg-blue-500/10"}`}>
+                      {n.type === "emergency" ? <AlertTriangle size={14} className="text-red-600 dark:text-red-400" /> : <Bell size={14} className="text-blue-600 dark:text-blue-400" />}
                     </div>
                     <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-0.5">{n.title}</h4>
                       <p className="text-sm text-gray-800 dark:text-white">{n.message}</p>
                       <div className="flex flex-wrap items-center gap-3 mt-1.5">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${TYPE_STYLES[n.type]}`}>{n.type}</span>

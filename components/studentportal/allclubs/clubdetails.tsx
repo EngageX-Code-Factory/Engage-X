@@ -39,6 +39,7 @@ interface ClubDetailsData {
   whatWeDo: string[];
   gallery: string[];
   events: ClubEvent[];
+  isMember: boolean;
   socialLinks?: {
     facebook?: string;
     twitter?: string;
@@ -100,20 +101,18 @@ function EventCard({ event }: { event: ClubEvent }) {
         </div>
 
         {/* Buttons */}
-        <div className="flex gap-2 mt-4">
+        <div className="mt-4">
           {event.status === 'FILLED' ? (
-            <button className="flex-1 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-xs font-medium cursor-not-allowed">
+            <button className="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-xs font-medium cursor-not-allowed text-center">
               Waitlist Only
             </button>
           ) : (
-            <>
-              <button className="flex-1 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium transition-colors">
-                Register
-              </button>
-              <button className="flex-1 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 text-xs font-medium transition-colors">
-                Details
-              </button>
-            </>
+            <Link 
+              href={`/student/events/register/${event.id}`}
+              className="block w-full py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium transition-colors text-center"
+            >
+              Register Now
+            </Link>
           )}
         </div>
       </div>
@@ -192,7 +191,8 @@ export default function ClubDetails({ clubId }: ClubDetailsProps) {
             twitter: data.twitter_link || data.twitter || '#',
             instagram: data.instagram_link || data.instagram || '#',
             linkedin: data.linkedin_link || data.linkedin || '#',
-          }
+          },
+          isMember: data.is_member || false
         };
 
         setClub(mappedClub);
@@ -264,12 +264,14 @@ export default function ClubDetails({ clubId }: ClubDetailsProps) {
             </span>
           </div>
           {/* CTA */}
-          <button 
-            onClick={() => setShowJoinModal(true)}
-            className="mt-5 self-start flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-colors shadow-lg shadow-purple-500/20"
-          >
-            <UserPlus className="w-4 h-4" /> Join This Club
-          </button>
+          {!club.isMember && (
+            <button 
+              onClick={() => setShowJoinModal(true)}
+              className="mt-5 self-start flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-colors shadow-lg shadow-purple-500/20"
+            >
+              <UserPlus className="w-4 h-4" /> Join This Club
+            </button>
+          )}
         </div>
       </div>
 
