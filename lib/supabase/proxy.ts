@@ -47,24 +47,27 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
-  if (
-    request.nextUrl.pathname !== "/" &&
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/admin")
-  ) {
-    // no user, route-aware redirect
+  const isPublicRoute = 
+    request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname.startsWith("/auth") ||
+    request.nextUrl.pathname.startsWith("/api/public") ||
+    request.nextUrl.pathname === "/admin/login";
+
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
+  const isOrgRoute = request.nextUrl.pathname.startsWith("/organization");
+  const isStudentRoute = request.nextUrl.pathname.startsWith("/student") || request.nextUrl.pathname.startsWith("/protected");
+
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     
-    // If trying to access organization portal, send to org login
-    if (request.nextUrl.pathname.startsWith("/organization")) {
+    if (isAdminRoute) {
+      url.pathname = "/admin/login";
+    } else if (isOrgRoute) {
       url.pathname = "/auth/org/login";
     } else {
-      // Default fallback for student/protected routes
       url.pathname = "/auth/login";
     }
     
-    url.pathname = "/admin/login";
     return NextResponse.redirect(url);
   }
 
