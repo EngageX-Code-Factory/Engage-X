@@ -2,209 +2,333 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { 
-  Users, Trophy, Calendar, ShieldCheck, Activity, 
-  ChevronLeft, Loader2, BarChart3, TrendingUp,
-  ArrowUpRight, Users2, Target
+import {
+  Users, Trophy, Calendar, ShieldCheck, Activity,
+  ChevronLeft, Loader2, TrendingUp, ArrowUpRight,
+  MapPin, Clock, Users2, CheckCircle2, Timer,
+  AlertCircle, Circle, BarChart3, RefreshCw, Search, X
 } from 'lucide-react';
 import Link from 'next/link';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface EventRow {
+  id: string;
+  title: string;
+  event_date: string;
+  event_time: string;
+  event_end_time: string | null;
+  location: string;
+  status: 'OPEN' | 'FILLED' | 'SOON' | 'CLOSED';
+  attendees: number;
+  registrations: number;
+  club_name: string | null;
+}
+
+interface ClubRow {
+  clubid: string;
+  club_name: string;
+  category: string;
+  active_members: number;
+  member_count: number;
+}
+
+interface Stats {
+  users: number;
+  clubs: number;
+  events: number;
+  totalRegistrations: number;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmtTime(t: string | null) {
+  if (!t) return '—';
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function getEventPhase(event: EventRow): 'upcoming' | 'ongoing' | 'ended' | 'pending' {
+  const now   = new Date();
+  const start = new Date(`${event.event_date}T${event.event_time}`);
+  const end   = event.event_end_time
+    ? new Date(`${event.event_date}T${event.event_end_time}`)
+    : null;
+
+  if (event.status === 'CLOSED') return 'ended';
+  if (now < start) {
+    const diffH = (start.getTime() - now.getTime()) / 3600000;
+    return diffH <= 24 ? 'pending' : 'upcoming';
+  }
+  if (end && now > end) return 'ended';
+  return 'ongoing';
+}
+
+const PHASE_META = {
+  upcoming: { label: 'Upcoming',  color: '#3b82f6', bg: 'rgba(59,130,246,0.1)',  border: 'rgba(59,130,246,0.22)', icon: Circle },
+  pending:  { label: 'Starting Soon', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)', icon: Timer },
+  ongoing:  { label: 'Ongoing',   color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.22)', icon: Activity },
+  ended:    { label: 'Ended',     color: '#64748b', bg: 'rgba(100,116,139,0.08)', border: 'rgba(100,116,139,0.18)', icon: CheckCircle2 },
+};
+
 export default function SystemDashboard() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ users: 0, clubs: 0, events: 0, health: 98 });
-  const [activeClubs, setActiveClubs] = useState<any[]>([]);
-  const [pastEventStats, setPastEventStats] = useState<any[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [stats,    setStats]    = useState<Stats>({ users: 0, clubs: 0, events: 0, totalRegistrations: 0 });
+  const [events,   setEvents]   = useState<EventRow[]>([]);
+  const [clubs,    setClubs]    = useState<ClubRow[]>([]);
+  const [filter,   setFilter]   = useState<'all' | 'upcoming' | 'pending' | 'ongoing' | 'ended'>('all');
   
+  // NEW: Search state for clubs
+  const [clubSearch, setClubSearch] = useState('');
+
   const supabase = createClient();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const [
+      { count: userCount },
+      { count: clubCount },
+      { count: eventCount },
+      { count: regCount },
+    ] = await Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }),
+      supabase.from('clubs').select('*', { count: 'exact', head: true }),
+      supabase.from('events').select('*', { count: 'exact', head: true }),
+      supabase.from('my_events').select('*', { count: 'exact', head: true }),
+    ]);
 
-    // 1. Fetch Basic Counts
-    const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-    const { count: clubCount } = await supabase.from('clubs').select('*', { count: 'exact', head: true });
-    const { count: eventCount } = await supabase.from('events').select('*', { count: 'exact', head: true });
-
-    // 2. Fetch Most Active Clubs (by active_members column)
-    const { data: topClubs } = await supabase
-      .from('clubs')
-      .select('club_name, active_members, clubid')
-      .order('active_members', { ascending: false })
-      .limit(3);
-
-    // 3. Fetch Event Engagement (Attendance Data for Organisers)
-    // We join events with my_events to see Regs vs Actual Attendees
-    const { data: engagementData } = await supabase
+    const { data: eventsRaw } = await supabase
       .from('events')
       .select(`
-        id, 
-        title, 
-        attendees,
-        my_events (attended)
+        id, title, event_date, event_time, event_end_time,
+        location, status, attendees,
+        clubs ( club_name ),
+        my_events ( id )
       `)
-      .order('event_date', { ascending: false })
-      .limit(4);
+      .order('event_date', { ascending: true })
+      .order('event_time', { ascending: true });
 
-    if (engagementData) {
-      const processed = engagementData.map(ev => {
-        const regs = ev.my_events?.length || 0;
-        const actual = ev.my_events?.filter((m: any) => m.attended).length || 0;
-        return {
-          title: ev.title,
-          regs,
-          actual,
-          rate: regs > 0 ? Math.round((actual / regs) * 100) : 0
-        };
-      });
-      setPastEventStats(processed);
-    }
+    const processedEvents: EventRow[] = (eventsRaw ?? []).map((e: any) => ({
+      id:            e.id,
+      title:         e.title,
+      event_date:    e.event_date,
+      event_time:    e.event_time,
+      event_end_time: e.event_end_time,
+      location:      e.location,
+      status:        e.status,
+      attendees:     e.attendees ?? 0,
+      registrations: Array.isArray(e.my_events) ? e.my_events.length : 0,
+      club_name:     e.clubs?.club_name ?? null,
+    }));
+
+    const { data: clubsRaw } = await supabase
+      .from('clubs')
+      .select(`
+        clubid, club_name, category, active_members,
+        my_clubs ( id, status )
+      `)
+      .order('active_members', { ascending: false });
+
+    const processedClubs: ClubRow[] = (clubsRaw ?? []).map((c: any) => ({
+      clubid:        c.clubid,
+      club_name:     c.club_name,
+      category:      c.category,
+      active_members: c.active_members ?? 0,
+      member_count:  Array.isArray(c.my_clubs)
+        ? c.my_clubs.filter((m: any) => ['ACTIVE', 'LEADER'].includes(m.status)).length
+        : 0,
+    }));
 
     setStats({
-      users: userCount || 0,
-      clubs: clubCount || 0,
-      events: eventCount || 0,
-      health: 98
+      users:              userCount  ?? 0,
+      clubs:              clubCount  ?? 0,
+      events:             eventCount ?? 0,
+      totalRegistrations: regCount   ?? 0,
     });
-
-    setActiveClubs(topClubs || []);
+    setEvents(processedEvents);
+    setClubs(processedClubs);
     setLoading(false);
   }, [supabase]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const filteredEvents = filter === 'all'
+    ? events
+    : events.filter(e => getEventPhase(e) === filter);
+
+  // NEW: Filtered clubs based on search input
+  const filteredClubs = clubs.filter(c => 
+    c.club_name.toLowerCase().includes(clubSearch.toLowerCase())
+  );
+
+  const phaseCounts = {
+    upcoming: events.filter(e => getEventPhase(e) === 'upcoming').length,
+    pending:  events.filter(e => getEventPhase(e) === 'pending').length,
+    ongoing:  events.filter(e => getEventPhase(e) === 'ongoing').length,
+    ended:    events.filter(e => getEventPhase(e) === 'ended').length,
+  };
+
   if (loading) return (
-    <div className="h-screen bg-[#080c14] flex items-center justify-center">
-      <Loader2 className="animate-spin text-blue-500" size={40} />
+    <div style={{ height: '100vh', background: '#080c14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Loader2 size={36} color="#3b82f6" style={{ animation: 'spin 1s linear infinite' }} />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#080c14] text-[#e2e8f0] font-sans p-6 md:p-12">
-      <div className="max-w-7xl mx-auto">
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #080c14; }
+        .sd-root { min-height:100vh; background:#080c14; color:#e2e8f0; font-family:'Sora',sans-serif; padding:32px; }
+        .sd-inner { max-width:1400px; margin:0 auto; }
+        .sd-topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:36px; }
+        .sd-back { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#475569; text-decoration:none; letter-spacing:.5px; text-transform:uppercase; transition:color .2s; }
+        .sd-back:hover { color:#f1f5f9; }
+        .sd-heading { font-size:18px; font-weight:800; color:#f1f5f9; letter-spacing:-0.3px; }
+        .sd-heading span { color:#3b82f6; }
+        .stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px; }
+        .stat-card { background:#0d1320; border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:22px; }
+        .stat-val { font-size:32px; font-weight:800; color:#f1f5f9; font-family:'JetBrains Mono',monospace; }
+        .sd-cols { display:grid; grid-template-columns:1fr 420px; gap:20px; }
+        .panel { background:#0d1320; border:1px solid rgba(255,255,255,.06); border-radius:16px; overflow:hidden; display:flex; flex-direction:column; }
+        .panel-header { padding:20px 22px 16px; border-bottom:1px solid rgba(255,255,255,.05); }
+        .panel-title { font-size:14px; font-weight:700; color:#f1f5f9; display:flex; align-items:center; gap:8px; }
         
-        {/* Header */}
-        <div className="flex justify-between items-center mb-10">
-          <Link href="/admin" className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors font-bold uppercase text-xs tracking-widest">
-            <ChevronLeft size={16} /> Exit to Portal
-          </Link>
-          <h1 className="text-xl font-bold italic uppercase tracking-widest text-white">System <span className="text-blue-500">Intelligence</span></h1>
-          <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-blue-500">
-             <ShieldCheck size={20} />
+        /* Search Bar UI */
+        .club-search-wrap { margin-top: 12px; position: relative; }
+        .club-search-input { width: 100%; background: rgba(8,12,20,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 14px 10px 36px; color: white; font-size: 12px; font-family: 'Sora', sans-serif; outline: none; transition: border-color 0.2s; }
+        .club-search-input:focus { border-color: #a855f7; }
+        .search-icon-inner { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #475569; }
+        .search-clear-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #475569; background: none; border: none; cursor: pointer; display: flex; }
+        
+        .event-list, .club-list { max-height:580px; overflow-y:auto; }
+        .club-row { display:flex; align-items:center; gap:12px; padding:11px 20px; border-bottom:1px solid rgba(255,255,255,.03); }
+        .club-icon { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:white; }
+        .club-bar-wrap { width:100%; height:2px; background:rgba(255,255,255,.05); border-radius:2px; overflow:hidden; margin-top:6px; }
+        .club-bar { height:100%; border-radius:2px; }
+      `}</style>
+
+      <div className="sd-root">
+        <div className="sd-inner">
+          <div className="sd-topbar">
+            <Link href="/admin" className="sd-back"><ChevronLeft size={14} /> Back to Portal</Link>
+            <div className="sd-heading">System <span>Intelligence</span></div>
+            <button className="sd-refresh" onClick={fetchData} title="Refresh"><RefreshCw size={14} /></button>
           </div>
-        </div>
 
-        {/* 4 Main Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-          <StatCard title="Total Users" value={stats.users.toLocaleString()} icon={<Users size={20}/>} trend="+12% growth" color="text-blue-400" />
-          <StatCard title="Total Clubs" value={stats.clubs} icon={<Trophy size={20}/>} trend="3 new this month" color="text-purple-400" />
-          <StatCard title="Active Events" value={stats.events} icon={<Calendar size={20}/>} trend="Live Tracking" color="text-orange-400" />
-          <StatCard title="Server Status" value={`${stats.health}%`} icon={<Activity size={20}/>} trend="Optimal" color="text-emerald-400" />
-        </div>
+          {/* Stat cards (Simplified loop for code brevity) */}
+          <div className="stat-grid">
+             <div className="stat-card">
+                <div className="stat-val">{stats.users.toLocaleString()}</div>
+                <div style={{fontSize: '11px', color: '#475569', textTransform: 'uppercase', marginTop: '4px'}}>Total Users</div>
+             </div>
+             <div className="stat-card">
+                <div className="stat-val">{stats.clubs}</div>
+                <div style={{fontSize: '11px', color: '#475569', textTransform: 'uppercase', marginTop: '4px'}}>Total Clubs</div>
+             </div>
+             <div className="stat-card">
+                <div className="stat-val">{stats.events}</div>
+                <div style={{fontSize: '11px', color: '#475569', textTransform: 'uppercase', marginTop: '4px'}}>Total Events</div>
+             </div>
+             <div className="stat-card">
+                <div className="stat-val">{stats.totalRegistrations.toLocaleString()}</div>
+                <div style={{fontSize: '11px', color: '#475569', textTransform: 'uppercase', marginTop: '4px'}}>Event Regs</div>
+             </div>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          {/* Left: Most Active Clubs */}
-          <div className="bg-[#0d1320] border border-white/5 rounded-[2.5rem] p-10 relative overflow-hidden">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-lg font-bold text-white uppercase italic tracking-tight">Top performing Clubs</h3>
-              <TrendingUp className="text-blue-500" size={20} />
-            </div>
-
-            <div className="space-y-6">
-              {activeClubs.map((club, idx) => (
-                <div key={club.clubid} className="flex items-center justify-between group p-4 bg-white/[0.02] rounded-2xl border border-white/5">
-                  <div className="flex items-center gap-5">
-                    <div className="w-12 h-12 bg-blue-600/10 rounded-xl flex items-center justify-center text-blue-500 font-black text-lg border border-blue-500/20">
-                      {club.club_name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-bold text-white">{club.club_name}</p>
-                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{club.active_members} verified members</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-blue-400 font-mono font-bold text-lg">{94 - (idx * 6)}%</p>
-                    <p className="text-[9px] text-slate-600 uppercase font-black">Engagement</p>
-                  </div>
+          <div className="sd-cols">
+            {/* LEFT: Events (Keep your existing logic) */}
+            <div className="panel">
+                <div className="panel-header">
+                  <div className="panel-title"><Calendar size={15} color="#3b82f6" /> Event Schedule</div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right: Engagement Analytics for Organisers */}
-          <div className="bg-[#0d1320] border border-white/5 rounded-[2.5rem] p-10">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h3 className="text-lg font-bold text-white uppercase italic tracking-tight">Engagement Analytics</h3>
-                <p className="text-xs text-slate-500 mt-1">Predictive data for hackathon organisers</p>
-              </div>
-              <BarChart3 className="text-purple-500" size={24} />
-            </div>
-
-            <div className="space-y-6">
-              {pastEventStats.length === 0 ? (
-                <div className="py-10 text-center text-slate-600 italic">Insufficient event data for analysis.</div>
-              ) : (
-                pastEventStats.map((event, i) => (
-                  <div key={i} className="relative p-5 bg-white/[0.02] border border-white/5 rounded-2xl">
-                    <div className="flex justify-between items-center mb-4">
-                      <p className="text-sm font-bold text-white truncate max-w-[200px]">{event.title}</p>
-                      <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-1 rounded border border-purple-500/20">
-                        {event.rate}% Attendance
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center gap-3">
-                        <Users2 size={14} className="text-slate-500" />
-                        <div>
-                          <p className="text-xs font-bold text-white">{event.regs}</p>
-                          <p className="text-[9px] text-slate-500 uppercase">Registered</p>
+                <div className="event-list">
+                    {filteredEvents.map(ev => (
+                        <div className="club-row" key={ev.id} style={{padding: '16px 20px'}}>
+                            <div style={{flex: 1}}>
+                                <div style={{fontWeight: 700, fontSize: '13px'}}>{ev.title}</div>
+                                <div style={{fontSize: '10px', color: '#475569'}}>{ev.location} • {fmtDate(ev.event_date)}</div>
+                            </div>
+                            <div style={{textAlign: 'right', fontSize: '11px', color: '#3b82f6', fontWeight: 600}}>
+                                {ev.registrations} registered
+                            </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Target size={14} className="text-emerald-500" />
-                        <div>
-                          <p className="text-xs font-bold text-white">{event.actual}</p>
-                          <p className="text-[9px] text-slate-500 uppercase">Turnout</p>
-                        </div>
-                      </div>
-                    </div>
+                    ))}
+                </div>
+            </div>
 
-                    {/* Progress bar */}
-                    <div className="w-full h-1.5 bg-white/5 rounded-full mt-4 overflow-hidden">
-                       <div 
-                         className="h-full bg-gradient-to-r from-blue-600 to-purple-600" 
-                         style={{ width: `${event.rate}%` }} 
-                       />
-                    </div>
+            {/* RIGHT: Clubs with SEARCH */}
+            <div className="panel">
+              <div className="panel-header">
+                <div>
+                  <div className="panel-title">
+                    <Trophy size={15} color="#a855f7" />
+                    Club Registry
                   </div>
-                ))
-              )}
+                  <div style={{fontSize: '11px', color: '#475569', marginTop: '2px'}}>Live member analytics</div>
+                </div>
+                
+                {/* NEW: Club Search Bar */}
+                <div className="club-search-wrap">
+                    <Search size={14} className="search-icon-inner" />
+                    <input 
+                        type="text" 
+                        className="club-search-input" 
+                        placeholder="Search club name..." 
+                        value={clubSearch}
+                        onChange={(e) => setClubSearch(e.target.value)}
+                    />
+                    {clubSearch && (
+                        <button className="search-clear-btn" onClick={() => setClubSearch('')}>
+                            <X size={14} />
+                        </button>
+                    )}
+                </div>
+              </div>
+
+              <div className="club-list">
+                {filteredClubs.length === 0 ? (
+                  <div style={{padding: '40px', textAlign: 'center', color: '#475569'}}>
+                    <Search size={24} style={{margin: '0 auto 10px'}} />
+                    <p style={{fontSize: '12px'}}>No clubs match "{clubSearch}"</p>
+                  </div>
+                ) : (() => {
+                  const maxMembers = Math.max(...clubs.map(c => c.member_count), 1);
+                  const GRAD = [['#1d4ed8','#3b82f6'], ['#7c3aed','#a855f7'], ['#0f766e','#14b8a6'], ['#c2410c','#f97316']];
+                  
+                  return filteredClubs.map((club, idx) => {
+                    const [g1, g2] = GRAD[idx % GRAD.length];
+                    const barPct = Math.round((club.member_count / maxMembers) * 100);
+                    return (
+                      <div className="club-row" key={club.clubid}>
+                        <div className="club-icon" style={{ background: `linear-gradient(135deg,${g1},${g2})` }}>
+                          {club.club_name[0].toUpperCase()}
+                        </div>
+                        <div style={{flex: 1, minWidth: 0}}>
+                          <div style={{fontSize: '13px', fontWeight: 700, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{club.club_name}</div>
+                          <div style={{fontSize: '10px', color: '#475569', fontFamily: 'JetBrains Mono'}}>{club.category}</div>
+                          <div className="club-bar-wrap">
+                            <div className="club-bar" style={{ width: `${barPct}%`, background: `linear-gradient(90deg,${g1},${g2})` }} />
+                          </div>
+                        </div>
+                        <div style={{textAlign: 'right'}}>
+                          <div style={{fontSize: '14px', fontWeight: 700, color: g2, fontFamily: 'JetBrains Mono'}}>{club.member_count}</div>
+                          <div style={{fontSize: '9px', color: '#334155', textTransform: 'uppercase'}}>active</div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
             </div>
           </div>
-
         </div>
       </div>
-    </div>
-  );
-}
-
-function StatCard({ title, value, icon, trend, color }: any) {
-  return (
-    <div className="bg-[#0d1320] border border-white/5 rounded-[2rem] p-8 group hover:border-white/10 transition-all relative overflow-hidden">
-      <div className="flex justify-between items-start mb-6">
-        <div className="p-3 bg-white/5 rounded-2xl text-slate-400 group-hover:text-blue-500 transition-colors border border-white/5">
-          {icon}
-        </div>
-        <span className="text-[9px] font-black uppercase text-blue-500 tracking-tighter flex items-center gap-1">
-           {trend} <ArrowUpRight size={10} />
-        </span>
-      </div>
-      <div>
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{title}</p>
-        <h4 className="text-4xl font-black text-white italic">{value}</h4>
-      </div>
-    </div>
+    </>
   );
 }

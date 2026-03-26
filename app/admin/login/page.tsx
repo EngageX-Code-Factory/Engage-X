@@ -295,7 +295,7 @@ export default function AdminLoginPage() {
               ) : (
                 <>
                   <Shield size={16} />
-                  Identify & Authorise
+                  Login
                   <ChevronRight size={14} style={{ marginLeft: 2, opacity: .7 }} />
                 </>
               )}
@@ -306,7 +306,7 @@ export default function AdminLoginPage() {
           <div className="al-register-link">
             No administrative credentials? <br />
             <Link href="/admin/register">
-              <UserPlus size={14} /> Request System Access
+              <UserPlus size={14} /> Signin here
             </Link>
           </div>
 
