@@ -44,7 +44,10 @@ const iconRegistry: Record<string, any> = {
   Calendar,
 };
 
-const initialTips: Tip[] = [];
+const initialTips: Tip[] = [
+  { iconName: 'CheckCircle', text: 'Consider reviewing your schedule to balance workload.', color: 'text-orange-400' },
+  { iconName: 'Info', text: 'AI Seminar is recommended based on your interests.', color: 'text-indigo-400' },
+];
 
 const eventColors: Record<EventType, string> = {
   club: 'bg-indigo-500/10 border border-indigo-500/20',
@@ -60,18 +63,41 @@ function getDynamicInitialWeek(): DayPlan[] {
   const week: DayPlan[] = [];
   const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
+  const mockEvents = [
+    [{ id: 100, time: '03:00 PM', title: 'Self-Study', type: 'academic' as EventType }],
+    [
+      { id: 1, time: '10:00 AM', title: 'Robotics Club', type: 'club' as EventType },
+      { id: 2, time: '01:00 PM', title: 'Lecture: CS101', type: 'academic' as EventType },
+    ],
+    [
+      { id: 3, time: '09:00 AM', title: 'Career Fair', type: 'event' as EventType },
+      { id: 4, time: '11:00 AM', title: 'Tech Talk', type: 'event' as EventType, gap: true },
+      { id: 5, time: '02:00 PM', title: 'Lab: Physics', type: 'academic' as EventType },
+    ],
+    [{ id: 6, time: '04:00 PM', title: 'AI Seminar', type: 'event' as EventType, recommended: true }],
+    [],
+    [],
+    [{ id: 101, time: '06:00 PM', title: 'Music Fest', type: 'event' as EventType }],
+  ];
+
   for (let i = 0; i < 7; i++) {
     const date = new Date();
     date.setDate(date.getDate() + i);
     const dayLabel = days[date.getDay()];
 
+    let featured;
+    if (i === 5) {
+      featured = { time: '09:00 AM', title: 'Hackathon 2026' };
+    }
+
     week.push({
       dayLabel,
       date: date.getDate(),
       isToday: i === 0,
-      isBusy: false,
-      isFreeAfternoon: false,
-      events: [],
+      isBusy: i === 2,
+      isFreeAfternoon: i === 3 || i === 4,
+      events: mockEvents[i] || [],
+      featured
     });
   }
   return week;
@@ -134,14 +160,14 @@ function DayColumn({ day }: { day: DayPlan }) {
       let gapUI = null;
       if (i < eventsList.length - 1) {
         const nextEv = eventsList[i + 1];
-
+        
         let currentEndMins = parseTime(ev.time) + 60; // assume 1 hour fallback
         if (ev.endTime) {
           currentEndMins = parseTime(ev.endTime);
         }
-
+        
         const gapMins = parseTime(nextEv.time) - currentEndMins;
-
+        
         if (gapMins >= 15) { // Adjusted to 15 mins to show more granular free time
           const hours = Math.floor(gapMins / 60);
           const mins = gapMins % 60;
@@ -185,14 +211,14 @@ function DayColumn({ day }: { day: DayPlan }) {
   if (dayEvents.length > 0 && eveningEvents.length > 0) {
     const lastDayEv = dayEvents[dayEvents.length - 1];
     const firstEveEv = eveningEvents[0];
-
+    
     let currentEndMins = parseTime(lastDayEv.time) + 60;
     if (lastDayEv.endTime) {
-      currentEndMins = parseTime(lastDayEv.endTime);
+       currentEndMins = parseTime(lastDayEv.endTime);
     }
-
+    
     const gapMins = parseTime(firstEveEv.time) - currentEndMins;
-
+    
     if (gapMins >= 60) {
       const hours = Math.floor(gapMins / 60);
       const mins = gapMins % 60;
@@ -245,47 +271,6 @@ function DayColumn({ day }: { day: DayPlan }) {
         )}
       </div>
 
-      {/* End of Day Gap (After the last event of the day) */}
-      {(() => {
-        const lastEvent = eveningEvents.length > 0
-          ? eveningEvents[eveningEvents.length - 1]
-          : dayEvents.length > 0
-            ? dayEvents[dayEvents.length - 1]
-            : null;
-
-        if (lastEvent) {
-          const dayEndMins = 22 * 60; // 10:00 PM
-          let lastEndMins = parseTime(lastEvent.time) + 60;
-          if (lastEvent.endTime) {
-            lastEndMins = parseTime(lastEvent.endTime);
-          }
-
-          const gapMins = dayEndMins - lastEndMins;
-          if (gapMins >= 30) {
-            const hours = Math.floor(gapMins / 60);
-            const mins = gapMins % 60;
-            const timeStr = hours > 0 ? `${hours}h ${mins > 0 ? mins + 'm ' : ''}` : `${mins}m `;
-            return (
-              <div className="relative flex-1 mt-4 mb-2 min-h-[100px] flex flex-col items-center">
-                {/* Upper Vertical Line */}
-                <div className="w-px flex-1 border-l border-dashed border-teal-500/30" />
-                
-                {/* Free Time with Cut Lines */}
-                <div className="flex flex-col items-center py-2">
-                  <div className="py-2.5 px-4 flex flex-col items-center">
-                    <span className="text-[10px] text-teal-400 font-bold tracking-widest leading-none">{timeStr} FREE</span>
-                  </div>
-                </div>
-
-                {/* Lower Vertical Line */}
-                <div className="w-px flex-1 border-l border-dashed border-teal-500/30" />
-              </div>
-            );
-          }
-        }
-        return null;
-      })()}
-
       {day.featured && !isFeatured && (
         <div className="flex-1 rounded-xl bg-gradient-to-b from-cyan-500/30 to-teal-500/10 border border-cyan-500/30 p-3 flex flex-col justify-between mt-auto">
           <div>
@@ -323,35 +308,18 @@ function DayColumn({ day }: { day: DayPlan }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────
-import { createClient } from '@/lib/supabase/client';
-
 export default function EventPlanner() {
   const [weekPage, setWeekPage] = useState(0);
   const [fullWeek, setFullWeek] = useState<DayPlan[]>([]);
   const [tips, setTips] = useState<Tip[]>(initialTips);
-  const [balanceScore, setBalanceScore] = useState<number>(0);
+  const [balanceScore, setBalanceScore] = useState<number>(85);
   const [loadingAI, setLoadingAI] = useState(false);
   const [isGenerated, setIsGenerated] = useState(false); // Track if AI successfully ran
-  const [userId, setUserId] = useState<string | null>(null);
 
-  // Fetch current user ID on mount
+  // Run once on client mount to dynamically set dates or load from localStorage
   useEffect(() => {
-    const fetchUser = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  // Run when userId is available to load from localStorage or set dynamic weeks
-  useEffect(() => {
-    if (!userId) return; // Wait for user ID to ensure isolation
-
     try {
-      const savedData = localStorage.getItem(`engagex_saved_schedule_${userId}`);
+      const savedData = localStorage.getItem('engagex_saved_schedule');
       if (savedData) {
         const parsed = JSON.parse(savedData);
         if (parsed && parsed.fullWeek) {
@@ -366,9 +334,9 @@ export default function EventPlanner() {
       console.error('Failed to parse saved schedule', e);
     }
 
-    // If nothing saved in localStorage for this user, load the dynamic mock template
+    // If nothing saved in localStorage, load the dynamic mock template
     setFullWeek(getDynamicInitialWeek());
-  }, [userId]);
+  }, []);
 
   const TOTAL_PAGES = Math.ceil(fullWeek.length / DAYS_PER_PAGE) || 1;
 
@@ -385,7 +353,6 @@ export default function EventPlanner() {
     : 'Planning your week...';
 
   const handleGenerateAI = async () => {
-    if (!userId) return; // Defensive check
     setLoadingAI(true);
 
     // Pass current date context to AI so it knows what week it is modifying
@@ -424,8 +391,8 @@ export default function EventPlanner() {
         setWeekPage(0); // Reset to first page
         setIsGenerated(true);
 
-        // Permanently save this generated schedule across page reloads for THIS user
-        localStorage.setItem(`engagex_saved_schedule_${userId}`, JSON.stringify({
+        // Permanently save this generated schedule across page reloads
+        localStorage.setItem('engagex_saved_schedule', JSON.stringify({
           fullWeek: safeWeek,
           tips: data.tips || [],
           balanceScore: data.balanceScore

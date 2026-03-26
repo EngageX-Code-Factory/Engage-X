@@ -13,7 +13,6 @@ export function LoginForm({
 }: React.ComponentPropsWithoutRef<"div">) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,12 +21,6 @@ export function LoginForm({
 
   useEffect(() => {
     setMounted(true);
-    // Load saved email if exists
-    const savedEmail = localStorage.getItem("engagex_remembered_email");
-    if (savedEmail) {
-      setEmail(savedEmail);
-      setRememberMe(true);
-    }
   }, []);
 
   if (!mounted) {
@@ -46,14 +39,6 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
-
-      // Save email if remember me is checked
-      if (rememberMe) {
-        localStorage.setItem("engagex_remembered_email", email);
-      } else {
-        localStorage.removeItem("engagex_remembered_email");
-      }
-
       router.push("/student");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
@@ -181,8 +166,6 @@ export function LoginForm({
                   <input
                     type="checkbox"
                     className="peer sr-only"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
                   />
                   <div className="flex h-[18px] w-[18px] items-center justify-center rounded bg-white/10 transition-colors duration-300 peer-checked:bg-[#8E2DE2]">
                     <svg className="h-3 w-3 text-white opacity-0 peer-checked:opacity-100" viewBox="0 0 14 14" fill="none">

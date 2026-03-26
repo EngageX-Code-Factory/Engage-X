@@ -53,8 +53,17 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/admin")
   ) {
-    // no user, potentially respond by redirecting the user to the login page
+    // no user, route-aware redirect
     const url = request.nextUrl.clone();
+    
+    // If trying to access organization portal, send to org login
+    if (request.nextUrl.pathname.startsWith("/organization")) {
+      url.pathname = "/auth/org/login";
+    } else {
+      // Default fallback for student/protected routes
+      url.pathname = "/auth/login";
+    }
+    
     url.pathname = "/admin/login";
     return NextResponse.redirect(url);
   }

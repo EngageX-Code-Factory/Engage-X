@@ -1,7 +1,9 @@
+import Dashboard from "@/components/organizations/Dashboard";
+
 export default function OrganizationPage() {
-    return (
-        <div>
-            <h1>Organization</h1>
-        </div>
-    );
+  return (
+    <div className="p-4 lg:p-10">
+      <Dashboard />
+    </div>
+  );
 }
