@@ -237,7 +237,7 @@ Return a JSON array of 3 objects containing the eventId and the aiRecommenderRea
       };
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite',
+        model: 'gemini-2.5-flash',
         contents: promptContext,
         config: {
           responseMimeType: 'application/json',
