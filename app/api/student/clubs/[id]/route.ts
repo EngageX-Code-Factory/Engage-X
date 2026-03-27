@@ -31,7 +31,20 @@ export async function GET(
             return NextResponse.json({ error: 'Club not found' }, { status: 404 });
         }
 
-        return NextResponse.json(club);
+        const { data: { user } } = await supabase.auth.getUser();
+        let is_member = false;
+        if (user) {
+            const { data: membership } = await supabase
+                .from('my_clubs')
+                .select('id')
+                .eq('club_id', id)
+                .eq('user_id', user.id)
+                .in('status', ['ACTIVE', 'LEADER'])
+                .single();
+            if (membership) is_member = true;
+        }
+
+        return NextResponse.json({ ...club, is_member });
     } catch (error) {
         console.error('Error in club detail API:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

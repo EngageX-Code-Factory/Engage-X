@@ -47,15 +47,27 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
-  if (
-    request.nextUrl.pathname !== "/" &&
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth")
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  const isPublicRoute = 
+    request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname.startsWith("/auth") ||
+    request.nextUrl.pathname.startsWith("/api/public") ||
+    request.nextUrl.pathname === "/admin/login";
+
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
+  const isOrgRoute = request.nextUrl.pathname.startsWith("/organization");
+  const isStudentRoute = request.nextUrl.pathname.startsWith("/student") || request.nextUrl.pathname.startsWith("/protected");
+
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
+    
+    if (isAdminRoute) {
+      url.pathname = "/admin/login";
+    } else if (isOrgRoute) {
+      url.pathname = "/auth/org/login";
+    } else {
+      url.pathname = "/auth/login";
+    }
+    
     return NextResponse.redirect(url);
   }
 

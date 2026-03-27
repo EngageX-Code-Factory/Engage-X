@@ -2,7 +2,7 @@
 
 import { Bell, ChevronDown, Zap, Home } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
@@ -17,7 +17,6 @@ const navLinks = [
 ];
 
 export default function Navbar() {
-  const router = useRouter();
   const [profileOpen, setProfileOpen] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -123,21 +122,6 @@ export default function Navbar() {
       }
     };
     fetchProfile();
-  }, []);
-
-  // Listen for profile updates from the profile page
-  useEffect(() => {
-    const handleProfileUpdate = (event: any) => {
-      const { firstName, lastName, avatarUrl } = event.detail;
-      setProfileData({
-        firstName,
-        lastName,
-        avatarUrl
-      });
-    };
-
-    window.addEventListener('profile-updated', handleProfileUpdate);
-    return () => window.removeEventListener('profile-updated', handleProfileUpdate);
   }, []);
 
   return (
@@ -260,10 +244,9 @@ export default function Navbar() {
       <ConfirmationModal
         isOpen={showSignOutModal}
         onClose={() => setShowSignOutModal(false)}
-        onConfirm={async () => {
-          const supabase = createClient();
-          await supabase.auth.signOut();
-          router.push('/');
+        onConfirm={() => {
+          console.log('User signed out');
+          // Add actual sign out redirect logic here if needed
         }}
         title="Sign Out"
         message="Are you sure you want to sign out of your EngageX account?"

@@ -27,15 +27,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
+    <body className={`${geistSans.className} antialiased`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="dark" // Try setting a default to help the script
           enableSystem
           disableTransitionOnChange
         >
           {children}
-          <Toaster richColors position="top-right" />
         </ThemeProvider>
       </body>
     </html>
